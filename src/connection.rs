@@ -41,7 +41,7 @@ impl Connection {
     /// send a message
     ///
     /// FIXME: any message above 512 bytes will be dropped
-    pub async fn send(&self, address: String, data: Vec<u8>) -> Result<(), Box<dyn Error>> {
+    pub async fn send(&self, address: &str, data: Vec<u8>) -> Result<(), Box<dyn Error>> {
         if data.len() <= 512 {
             let buffer: &[u8] = &data;
 

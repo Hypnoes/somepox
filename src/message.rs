@@ -11,9 +11,9 @@ pub struct Issue {
 }
 
 impl Issue {
-    pub fn new(contents: String, issue_types: IssueType) -> Issue {
+    pub fn new(contents: &str, issue_types: IssueType) -> Issue {
         Issue {
-            content: contents,
+            content: contents.to_string(),
             id: Uuid::new_v4().to_string(),
             issue_type: issue_types,
         }
@@ -51,16 +51,20 @@ impl From<Vec<u8>> for Issue {
             }
             Err(_) => {
                 error!("not a valid UTF-8 string");
-                Issue::new("".to_string(), IssueType::Log)
+                Issue::new("", IssueType::Log)
             }
         }
     }
 }
 
-impl Into<Vec<u8>> for Issue {
+impl Into<Vec<u8>> for &Issue {
     fn into(self) -> Vec<u8> {
-        let strf = vec![self.issue_type.to_string(), self.id, self.content];
-        strf.join("|").as_bytes().to_vec()
+        let p_1_s = &self.issue_type.to_string();
+        let p_1 = p_1_s.as_bytes();
+        let p_2 = self.id.as_bytes();
+        let p_3 = self.content.as_bytes();
+
+        vec![p_1, p_2, p_3].join("|".as_bytes())
     }
 }
 

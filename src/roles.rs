@@ -11,10 +11,14 @@ use crate::{
 
 const HALF_OF_VOTERS: u8 = 1;
 
-pub trait Roles<Proposal> {
-    fn connection(&self) -> Connection;
-    fn mailbox(&mut self) -> &mut MailBox<Proposal>;
-    fn handle_this_doc(&self, doc: &Proposal) -> Result<(), Box<dyn Error>>;
+pub trait Roles<'a, Proposal>
+where
+    Proposal: From<Vec<u8>>,
+    &'a Proposal: Into<Vec<u8>> + 'a,
+{
+    fn connection(&self) -> &Connection;
+    fn mailbox(&self) -> &MailBox<Proposal>;
+    fn handle_this_doc(&self, doc: &'a Proposal) -> Result<(), Box<dyn Error>>;
 
     fn do_work(&mut self) -> Result<(), Box<dyn Error>> {
         let doc = self.mailbox().get();
@@ -25,7 +29,7 @@ pub trait Roles<Proposal> {
         }
     }
 
-    fn send_msg<T: Into<Vec<u8>>>(&self, msg: &T, to: &str) -> Result<(), Box<dyn Error>> {
+    fn send_msg(&self, msg: &'a Proposal, to: &str) -> Result<(), Box<dyn Error>> {
         let conn = self.connection();
         let rt = Builder::new_current_thread()
             .enable_all()
@@ -33,11 +37,13 @@ pub trait Roles<Proposal> {
             .max_blocking_threads(1)
             .build()?;
 
-        self.mailbox()
-            .address_book()
-            .iter()
-            .filter(|x| x.0 == to)
-            .try_for_each(move |address| rt.block_on(conn.send(address.1, (*msg).into())))
+        let send_list = self.mailbox().address_book().iter().filter(|x| x.0 == to);
+
+        for x in send_list {
+            rt.block_on(conn.send(&(x.1), msg.into()));
+        }
+
+        Ok(())
     }
 }
 
@@ -53,11 +59,11 @@ pub struct President {
 }
 
 impl President {
-    fn hand_out_issue(&mut self, doc: &Issue) -> Result<(), Box<dyn Error>> {
+    fn hand_out_issue<'a>(&mut self, doc: &'a Issue) -> Result<(), Box<dyn Error>> {
         self.count.insert(doc.id().to_string(), 0);
         self.send_msg(doc, "senator")
     }
-    fn count_vote(&mut self, doc: &Issue) -> Result<(), Box<dyn Error>> {
+    fn count_vote<'a>(&mut self, doc: &'a Issue) -> Result<(), Box<dyn Error>> {
         let vote_result = self.count.get(doc.id());
         if vote_result
             .filter(move |vote_count| **vote_count > HALF_OF_VOTERS)
@@ -69,16 +75,16 @@ impl President {
     }
 }
 
-impl Roles<Issue> for President {
-    fn connection(&self) -> Connection {
-        self.connection
+impl<'a> Roles<'a, Issue> for President {
+    fn connection(&self) -> &Connection {
+        &self.connection
     }
 
-    fn mailbox(&mut self) -> &mut MailBox<Issue> {
-        &mut self.mail_box
+    fn mailbox(&self) -> &MailBox<Issue> {
+        &self.mail_box
     }
 
-    fn handle_this_doc(&self, doc: &Issue) -> Result<(), Box<dyn Error>> {
+    fn handle_this_doc(&self, doc: &'a Issue) -> Result<(), Box<dyn Error>> {
         match doc.issue_type() {
             IssueType::Proposal => self.hand_out_issue(doc),
             IssueType::Vote => self.count_vote(doc),
@@ -98,19 +104,19 @@ pub struct Secretary {
 }
 
 impl Secretary {
-    fn write_to_memo(&self, doc: Issue) {}
+    fn write_to_memo(&self, doc: &Issue) {}
 }
 
-impl Roles<Issue> for Secretary {
-    fn connection(&self) -> Connection {
-        self.connection
+impl<'a> Roles<'a, Issue> for Secretary {
+    fn connection(&self) -> &Connection {
+        &self.connection
     }
 
-    fn mailbox(&mut self) -> &mut MailBox<Issue> {
-        &mut self.mail_box
+    fn mailbox(&self) -> &MailBox<Issue> {
+        &self.mail_box
     }
 
-    fn handle_this_doc(&self, doc: &Issue) -> Result<(), Box<dyn Error>> {
+    fn handle_this_doc(&self, doc: &'a Issue) -> Result<(), Box<dyn Error>> {
         todo!()
     }
 }
