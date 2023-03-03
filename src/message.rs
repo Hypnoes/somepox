@@ -1,12 +1,11 @@
 use std::{borrow::Borrow, fmt::Display};
 
 use log::error;
-use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct Issue {
     content: String,
-    id: String,
+    id: u32,
     issue_type: IssueType,
 }
 
@@ -14,38 +13,38 @@ impl Issue {
     pub fn new(contents: &str, issue_types: IssueType) -> Issue {
         Issue {
             content: contents.to_string(),
-            id: Uuid::new_v4().to_string(),
+            id: 0,
             issue_type: issue_types,
         }
     }
 
     pub fn content(&self) -> &str {
-        self.content.borrow()
+        &self.content
     }
 
-    pub fn id(&self) -> &str {
-        self.id.borrow()
+    pub fn id(&self) -> u32 {
+        self.id
     }
 
     pub fn issue_type(&self) -> &IssueType {
-        self.issue_type.borrow()
+        &self.issue_type
     }
 }
 
 impl From<Vec<u8>> for Issue {
     fn from(bytes: Vec<u8>) -> Self {
-        let s = String::from_utf8(bytes);
+        let formatted_issue_string = String::from_utf8(bytes);
 
-        match s {
-            Ok(r) => {
-                let g: Vec<&str> = r.split("|").collect();
-                let it = IssueType::from(g[0]);
-                let id = g[1];
-                let cc = g[2];
+        match formatted_issue_string {
+            Ok(raw_issue_content) => {
+                let parts: Vec<&str> = raw_issue_content.split("|").collect();
+                let it = IssueType::from(parts[0]);
+                let id = u32::from_str_radix(parts[1], 10).unwrap_or(0);
+                let ct = parts[2].to_string();
 
                 Issue {
-                    content: cc.to_string(),
-                    id: id.to_string(),
+                    content: ct,
+                    id: id,
                     issue_type: it,
                 }
             }
@@ -57,14 +56,19 @@ impl From<Vec<u8>> for Issue {
     }
 }
 
+impl Into<Vec<u8>> for Issue {
+    fn into(self) -> Vec<u8> {
+        self.borrow().into()
+    }
+}
+
 impl Into<Vec<u8>> for &Issue {
     fn into(self) -> Vec<u8> {
-        let p_1_s = &self.issue_type.to_string();
-        let p_1 = p_1_s.as_bytes();
-        let p_2 = self.id.as_bytes();
-        let p_3 = self.content.as_bytes();
+        let coded_issue_type = self.issue_type.to_string().as_bytes();
+        let coded_issue_id = self.id.to_string().as_bytes();
+        let coded_issue_content = self.content.as_bytes();
 
-        vec![p_1, p_2, p_3].join("|".as_bytes())
+        vec![coded_issue_type, coded_issue_id, coded_issue_content].join("|".as_bytes())
     }
 }
 

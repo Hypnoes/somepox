@@ -1,7 +1,9 @@
-use std::{error::Error, fmt::Display, sync::Arc};
+use std::sync::Arc;
 
 use log::{error, info};
 use tokio::net::UdpSocket;
+
+use crate::error::GeneralError;
 
 pub struct Connection {
     host: String,
@@ -19,7 +21,7 @@ impl Connection {
     }
 
     pub async fn init(&mut self) {
-        let addr = String::from(&self.host) + ":" + &self.port.to_string();
+        let addr = format!("{}:{}", self.host, self.port);
 
         self.connection = {
             let socket = UdpSocket::bind(addr).await;
@@ -33,7 +35,7 @@ impl Connection {
         }
     }
 
-    pub async fn close(&mut self) -> Result<(), Box<dyn Error>> {
+    pub async fn close(&mut self) -> Result<(), GeneralError> {
         self.connection = None;
         Ok(())
     }
@@ -41,7 +43,7 @@ impl Connection {
     /// send a message
     ///
     /// FIXME: any message above 512 bytes will be dropped
-    pub async fn send(&self, address: &str, data: Vec<u8>) -> Result<(), Box<dyn Error>> {
+    pub async fn send(&self, address: &str, data: Vec<u8>) -> Result<(), GeneralError> {
         if data.len() <= 512 {
             let buffer: &[u8] = &data;
 
@@ -59,20 +61,17 @@ impl Connection {
 
             Ok(())
         } else {
-            Err(Box::new(ConnectionError {
-                msg: "cccc".to_string(),
-            }))
+            Err("data is too large".into())
         }
     }
 
     /// recv message
     ///
     /// FIXME: any message above 512 bytes will be dropped
-    pub async fn recv(&self) -> Result<Vec<u8>, Box<dyn Error>> {
+    pub async fn recv(&self) -> Result<Vec<u8>, GeneralError> {
         let mut msg: Vec<u8> = Vec::new();
-        let conn_ref = self.get_conn();
 
-        match conn_ref {
+        match self.get_conn() {
             Some(conn) => {
                 let buffer: &mut [u8; 512] = &mut [0; 512];
                 let record_size = conn.recv(buffer).await?;
@@ -87,30 +86,5 @@ impl Connection {
 
     fn get_conn(&self) -> Option<Arc<UdpSocket>> {
         self.connection.as_ref().map(|cc| cc.clone())
-    }
-}
-
-#[derive(Debug)]
-struct ConnectionError {
-    msg: String,
-}
-
-impl Error for ConnectionError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
-    }
-
-    fn description(&self) -> &str {
-        "description() is deprecated; use Display"
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        self.source()
-    }
-}
-
-impl Display for ConnectionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ConnectionError(msg: {})", self.msg)
     }
 }

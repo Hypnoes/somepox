@@ -1,7 +1,11 @@
 pub mod connection;
+pub mod error;
 pub mod mail;
 pub mod message;
 pub mod roles;
+
+type Deserializable = dyn From<Vec<u8>>;
+type Serializable = dyn Into<Vec<u8>>;
 
 #[cfg(test)]
 mod tests {
@@ -9,7 +13,7 @@ mod tests {
 
     #[test]
     fn test_issue() {
-        let test_issue = Issue::new("test".to_string(), IssueType::Log);
+        let test_issue = Issue::new("test", IssueType::Log);
 
         println!("{:#?}", test_issue);
     }
