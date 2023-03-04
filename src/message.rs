@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, fmt::Display};
+use std::fmt::Display;
 
 use log::error;
 
@@ -58,17 +58,14 @@ impl From<Vec<u8>> for Issue {
 
 impl Into<Vec<u8>> for Issue {
     fn into(self) -> Vec<u8> {
-        self.borrow().into()
-    }
-}
+        // 我麻了，深拷贝三次。。。
+        let coded_issue_type = self.clone().issue_type.to_string();
+        let coded_issue_id = self.clone().id.to_string();
+        let coded_issue_content = self.clone().content;
 
-impl Into<Vec<u8>> for &Issue {
-    fn into(self) -> Vec<u8> {
-        let coded_issue_type = self.issue_type.to_string().as_bytes();
-        let coded_issue_id = self.id.to_string().as_bytes();
-        let coded_issue_content = self.content.as_bytes();
-
-        vec![coded_issue_type, coded_issue_id, coded_issue_content].join("|".as_bytes())
+        vec![coded_issue_type, coded_issue_id, coded_issue_content]
+            .join("|")
+            .into_bytes()
     }
 }
 

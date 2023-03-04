@@ -5,13 +5,15 @@ use std::{
 
 use crate::error::GeneralError;
 
-pub struct MailBox<Content> {
+pub struct MailBox<Content>
+where
+    Content: Clone + From<Vec<u8>> + Into<Vec<u8>>,
+{
     mail_list: RefCell<VecDeque<Mail<Content>>>,
-    address_book: Box<Vec<(String, String)>>,
 }
 
-impl<Content> MailBox<Content> {
-    pub fn get_new_mail(&self) -> Result<Mail<Content>, GeneralError> {
+impl<Content: Clone + From<Vec<u8>> + Into<Vec<u8>>> MailBox<Content> {
+    pub fn get_mail(&self) -> Result<Mail<Content>, GeneralError> {
         match self.mail_list.try_borrow_mut()?.pop_front() {
             Some(mail) => Ok(mail),
             None => Err("MailBox is empty".into()),
@@ -20,10 +22,6 @@ impl<Content> MailBox<Content> {
 
     pub fn put_mail(&self, mail: Mail<Content>) -> Result<(), GeneralError> {
         Ok(self.mail_list.try_borrow_mut()?.push_back(mail))
-    }
-
-    pub fn address_book(&self) -> &Vec<(String, String)> {
-        &self.address_book
     }
 }
 
@@ -37,16 +35,39 @@ where
 }
 
 impl<Content: Clone + From<Vec<u8>> + Into<Vec<u8>>> Mail<Content> {
-    pub fn content(&self) -> &Content {
-        &self.content
+    pub fn new(from: String, to: String, content: Content) -> Mail<Content> {
+        Mail {
+            from: from,
+            to: to,
+            content: Box::new(content),
+        }
     }
 
-    pub fn new(from: &str, to: &str, content: &Content) -> Mail<Content> {
-        Mail {
-            from: String::from(from),
-            to: String::from(to),
-            content: Box::new(content.to_owned()),
+    pub fn content(&self) -> Content {
+        (*self.content).clone()
+    }
+
+    pub fn sender(&self) -> String {
+        self.from.clone()
+    }
+
+    pub fn receivers(&self) -> Vec<String> {
+        let mut rcs_v: Vec<String> = Vec::new();
+
+        for rcs in self.to.split(",").into_iter() {
+            rcs_v.push(rcs.to_owned());
         }
+
+        rcs_v
+    }
+}
+
+impl<Content> Into<Mail<Content>> for (String, String, Vec<u8>)
+where
+    Content: Clone + From<Vec<u8>> + Into<Vec<u8>>,
+{
+    fn into(self) -> Mail<Content> {
+        Mail::new(self.0, self.1, self.2.into())
     }
 }
 

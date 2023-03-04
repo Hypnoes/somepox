@@ -1,6 +1,5 @@
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
-use log::{error, info};
 use tokio::net::UdpSocket;
 
 use crate::error::GeneralError;
@@ -20,22 +19,14 @@ impl Connection {
         }
     }
 
-    pub async fn init(&mut self) {
+    pub async fn init(&mut self) -> Result<(), GeneralError> {
         let addr = format!("{}:{}", self.host, self.port);
-
-        self.connection = {
-            let socket = UdpSocket::bind(addr).await;
-            match socket {
-                Ok(r) => Some(Arc::new(r)),
-                Err(e) => {
-                    error!("{}", e);
-                    None
-                }
-            }
-        }
+        let raw_bind = UdpSocket::bind(addr).await?;
+        self.connection = Some(Arc::new(raw_bind));
+        Ok(())
     }
 
-    pub async fn close(&mut self) -> Result<(), GeneralError> {
+    pub fn close(&mut self) -> Result<(), GeneralError> {
         self.connection = None;
         Ok(())
     }
@@ -43,48 +34,62 @@ impl Connection {
     /// send a message
     ///
     /// FIXME: any message above 512 bytes will be dropped
-    pub async fn send(&self, address: &str, data: Vec<u8>) -> Result<(), GeneralError> {
-        if data.len() <= 512 {
-            let buffer: &[u8] = &data;
+    pub async fn send(
+        &self,
+        address: &str,
+        data: Vec<u8>,
+    ) -> Result<(String, String, usize), GeneralError> {
+        let addr = address
+            .to_owned()
+            .parse::<SocketAddr>()
+            .map_err(|e| GeneralError::from(e.to_string()))?;
 
-            let conn_ref = self.get_conn();
+        let maybe_sock = self.get_conn();
 
-            match conn_ref {
-                Some(conn) => {
-                    let result = conn.send_to(buffer, address).await?;
-                    info!("send {} bytes message.", result);
-                }
-                None => {
-                    error!("no connection available.");
-                }
+        match maybe_sock {
+            Some(sock) => {
+                let buffer: &[u8] = &data;
+                let record_size = sock.try_send_to(buffer, addr)?;
+
+                let local_address = sock.local_addr()?.to_string();
+                let remote_address = sock.peer_addr()?.to_string();
+
+                Ok((local_address, remote_address, record_size))
             }
-
-            Ok(())
-        } else {
-            Err("data is too large".into())
+            None => {
+                log::error!("no connection available.");
+                Err("No Connection available.".to_owned().into())
+            }
         }
     }
 
     /// recv message
     ///
     /// FIXME: any message above 512 bytes will be dropped
-    pub async fn recv(&self) -> Result<Vec<u8>, GeneralError> {
+    pub async fn recv(&self) -> Result<(String, String, Vec<u8>), GeneralError> {
         let mut msg: Vec<u8> = Vec::new();
+        let maybe_sock = self.get_conn();
 
-        match self.get_conn() {
-            Some(conn) => {
+        match maybe_sock {
+            Some(sock) => {
                 let buffer: &mut [u8; 512] = &mut [0; 512];
-                let record_size = conn.recv(buffer).await?;
-                msg.extend(&buffer[..record_size]);
-                info!("recv {} bytes message.", record_size);
-            }
-            None => error!("no connection available."),
-        }
 
-        Ok(msg)
+                let (record_size, _) = sock.try_recv_from(buffer)?;
+
+                msg.extend(&buffer[..record_size]);
+
+                let local_address = sock.local_addr()?.to_string();
+                let remote_address = sock.peer_addr()?.to_string();
+                Ok((remote_address, local_address, msg))
+            }
+            None => {
+                log::error!("no connection available.");
+                Err("No Connection available.".to_owned().into())
+            }
+        }
     }
 
     fn get_conn(&self) -> Option<Arc<UdpSocket>> {
-        self.connection.as_ref().map(|cc| cc.clone())
+        (&self.connection).map(|rc_socket| rc_socket.clone())
     }
 }
