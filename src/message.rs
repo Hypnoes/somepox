@@ -11,11 +11,11 @@ pub struct Issue {
 }
 
 impl Issue {
-    pub fn new(contents: &str, issue_types: IssueType) -> Issue {
+    pub fn new(content: String, id: u32, issue_type: IssueType) -> Self {
         Issue {
-            content: contents.to_string(),
-            id: 0,
-            issue_type: issue_types,
+            content,
+            id,
+            issue_type,
         }
     }
 
@@ -51,7 +51,11 @@ impl From<Bytes> for Issue {
             }
             Err(_) => {
                 error!("not a valid UTF-8 string");
-                Issue::new("", IssueType::Resolution)
+                Issue {
+                    content: "".to_owned(),
+                    id: 0,
+                    issue_type: IssueType::Proposal,
+                }
             }
         }
     }

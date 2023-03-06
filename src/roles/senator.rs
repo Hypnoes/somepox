@@ -4,7 +4,7 @@ use crate::{
     connection::Connection,
     error::GeneralError,
     mail::{Mail, MailBox},
-    message::Issue,
+    message::{Issue, IssueType},
 };
 
 use super::Roles;
@@ -18,6 +18,13 @@ pub struct Senator {
     send_box: MailBox<Issue>,
     recv_box: MailBox<Issue>,
     connection: Connection,
+    last_proposal_id: u32,
+}
+
+impl Senator {
+    fn my_address() -> String {
+        String::from("???")
+    }
 }
 
 impl Roles<Issue> for Senator {
@@ -41,6 +48,41 @@ impl Roles<Issue> for Senator {
         let role = self
             .roles(old_proposal.sender())
             .unwrap_or("error".to_string());
-        todo!()
+
+        match old_proposal.body().issue_type() {
+            crate::message::IssueType::Proposal => {
+                if role == "president".to_owned() {
+                    if old_proposal.body().id() > self.last_proposal_id {
+                        Ok(Mail::new(
+                            Senator::my_address(),
+                            self.address_book()
+                                .get("president")
+                                .map(|addr| addr.join(","))
+                                .unwrap_or("".to_string()),
+                            Issue::new(
+                                old_proposal.body().content().to_string(),
+                                old_proposal.body().id(),
+                                IssueType::Vote,
+                            ),
+                        ))
+                    } else {
+                        Err(format!(
+                            "received expire issue {}, last issue is {}, drop.",
+                            old_proposal.body().id(),
+                            self.last_proposal_id
+                        )
+                        .into())
+                    }
+                } else {
+                    Err(format!("recv a `Proposal` from {}", role).into())
+                }
+            }
+            crate::message::IssueType::Vote => {
+                Err("Senator does not process issue: Vote".to_owned().into())
+            }
+            crate::message::IssueType::Resolution => {
+                Err("Senator does not process issue: Vote".to_owned().into())
+            }
+        }
     }
 }

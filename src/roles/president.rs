@@ -5,6 +5,7 @@ use crate::{
     error::GeneralError,
     mail::{Mail, MailBox},
     message::{Issue, IssueType},
+    HALF_OF_VOTERS,
 };
 
 use super::Roles;
@@ -19,7 +20,7 @@ pub struct President {
     send_box: MailBox<Issue>,
     recv_box: MailBox<Issue>,
     connection: Connection,
-    count: RefCell<HashMap<String, u8>>,
+    count: RefCell<HashMap<u32, u8>>,
 }
 
 impl President {
@@ -27,11 +28,36 @@ impl President {
         "persident".to_string()
     }
 
+    /// 当收到提案时，生成提案表决记录，并且将提案分发至所有议员
     fn process_proposal(&self, issue: Issue) -> Result<Issue, GeneralError> {
-        todo!()
+        self.count.borrow_mut().insert(issue.id(), 0);
+        Ok(issue)
     }
+
+    /// 当收到投票时，为对应议案进行计票，如果票数过半，就生成议案交由书记记录
+    /// 当投票未过半，返回Error("not enough votes")
     fn process_vote(&self, issue: Issue) -> Result<Issue, GeneralError> {
-        todo!()
+        let mut cnt_table = self.count.borrow_mut();
+        let current_issue_cnt = cnt_table.get(&issue.id());
+        match current_issue_cnt {
+            // 此决议正在表决中
+            Some(cnt) => {
+                if cnt + 1 > HALF_OF_VOTERS {
+                    cnt_table.remove(&issue.id());
+                    Ok(Issue::new(
+                        issue.content().to_string(),
+                        issue.id(),
+                        IssueType::Resolution,
+                    ))
+                } else {
+                    Err("not enough votes".to_owned().into())
+                }
+            }
+            // 此决议已完成表决，或未有此决议的提案
+            None => Err("this proposal is not emmitted or finished"
+                .to_owned()
+                .into()),
+        }
     }
 }
 

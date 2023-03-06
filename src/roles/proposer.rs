@@ -4,7 +4,7 @@ use crate::{
     connection::Connection,
     error::GeneralError,
     mail::{Mail, MailBox},
-    message::Issue,
+    message::{Issue, IssueType},
 };
 
 use super::Roles;
@@ -16,6 +16,13 @@ pub struct Proposer {
     send_box: MailBox<Issue>,
     recv_box: MailBox<Issue>,
     connection: Connection,
+    counter: u32,
+}
+
+impl Proposer {
+    fn my_address() -> String {
+        String::from("0x0000000000000000000000000000000000000000")
+    }
 }
 
 impl Roles<Issue> for Proposer {
@@ -36,9 +43,17 @@ impl Roles<Issue> for Proposer {
     }
 
     fn draft_new(&self, old_proposal: Mail<Issue>) -> Result<Mail<Issue>, GeneralError> {
-        let role = self
-            .roles(old_proposal.sender())
-            .unwrap_or("error".to_string());
-        todo!()
+        Ok(Mail::new(
+            Proposer::my_address(),
+            self.address_book()
+                .get("president")
+                .map(|addr| addr.join(","))
+                .unwrap_or("".to_string()),
+            Issue::new(
+                old_proposal.body().content().to_string(),
+                self.counter + 1,
+                IssueType::Proposal,
+            ),
+        ))
     }
 }
