@@ -1,5 +1,6 @@
 use std::{net::SocketAddr, sync::Arc};
 
+use bytes::{Bytes, BytesMut};
 use tokio::net::UdpSocket;
 
 use crate::error::GeneralError;
@@ -37,7 +38,7 @@ impl Connection {
     pub async fn send(
         &self,
         address: &str,
-        data: Vec<u8>,
+        data: Bytes,
     ) -> Result<(String, String, usize), GeneralError> {
         let addr = address
             .to_owned()
@@ -66,8 +67,8 @@ impl Connection {
     /// recv message
     ///
     /// FIXME: any message above 512 bytes will be dropped
-    pub async fn recv(&self) -> Result<(String, String, Vec<u8>), GeneralError> {
-        let mut msg: Vec<u8> = Vec::new();
+    pub async fn recv(&self) -> Result<(String, String, Bytes), GeneralError> {
+        let mut msg = BytesMut::new();
         let maybe_sock = self.get_conn();
 
         match maybe_sock {
@@ -80,7 +81,7 @@ impl Connection {
 
                 let local_address = sock.local_addr()?.to_string();
                 let remote_address = sock.peer_addr()?.to_string();
-                Ok((remote_address, local_address, msg))
+                Ok((remote_address, local_address, msg.into()))
             }
             None => {
                 log::error!("no connection available.");
@@ -90,6 +91,6 @@ impl Connection {
     }
 
     fn get_conn(&self) -> Option<Arc<UdpSocket>> {
-        (&self.connection).map(|rc_socket| rc_socket.clone())
+        (self.connection.as_ref()).map(|socket_rc| socket_rc.clone())
     }
 }

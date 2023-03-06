@@ -3,16 +3,18 @@ use std::{
     collections::VecDeque,
 };
 
+use bytes::Bytes;
+
 use crate::error::GeneralError;
 
 pub struct MailBox<Content>
 where
-    Content: Clone + From<Vec<u8>> + Into<Vec<u8>>,
+    Content: Clone + From<Bytes> + Into<Bytes>,
 {
     mail_list: RefCell<VecDeque<Mail<Content>>>,
 }
 
-impl<Content: Clone + From<Vec<u8>> + Into<Vec<u8>>> MailBox<Content> {
+impl<Content: Clone + From<Bytes> + Into<Bytes>> MailBox<Content> {
     pub fn get_mail(&self) -> Result<Mail<Content>, GeneralError> {
         match self.mail_list.try_borrow_mut()?.pop_front() {
             Some(mail) => Ok(mail),
@@ -27,24 +29,24 @@ impl<Content: Clone + From<Vec<u8>> + Into<Vec<u8>>> MailBox<Content> {
 
 pub struct Mail<Content>
 where
-    Content: Clone + From<Vec<u8>> + Into<Vec<u8>>,
+    Content: Clone + From<Bytes> + Into<Bytes>,
 {
     from: String,
     to: String,
-    content: Box<Content>,
+    body: Box<Content>,
 }
 
-impl<Content: Clone + From<Vec<u8>> + Into<Vec<u8>>> Mail<Content> {
+impl<Content: Clone + From<Bytes> + Into<Bytes>> Mail<Content> {
     pub fn new(from: String, to: String, content: Content) -> Mail<Content> {
         Mail {
-            from: from,
-            to: to,
-            content: Box::new(content),
+            from,
+            to,
+            body: Box::new(content),
         }
     }
 
-    pub fn content(&self) -> Content {
-        (*self.content).clone()
+    pub fn body(&self) -> Content {
+        (*self.body).clone()
     }
 
     pub fn sender(&self) -> String {
@@ -62,12 +64,12 @@ impl<Content: Clone + From<Vec<u8>> + Into<Vec<u8>>> Mail<Content> {
     }
 }
 
-impl<Content> Into<Mail<Content>> for (String, String, Vec<u8>)
+impl<Content> From<(String, String, Bytes)> for Mail<Content>
 where
-    Content: Clone + From<Vec<u8>> + Into<Vec<u8>>,
+    Content: Clone + From<Bytes> + Into<Bytes>,
 {
-    fn into(self) -> Mail<Content> {
-        Mail::new(self.0, self.1, self.2.into())
+    fn from(value: (String, String, Bytes)) -> Self {
+        Mail::new(value.0, value.1, value.2.into())
     }
 }
 
