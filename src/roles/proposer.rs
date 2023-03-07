@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use crate::{
     connection::Connection,
-    error::GeneralError,
     mail::{Mail, MailBox},
     message::{Issue, IssueType},
 };
+use anyhow::Result;
 
 use super::Roles;
 
@@ -42,7 +42,7 @@ impl Roles<Issue> for Proposer {
         &(self.recv_box)
     }
 
-    fn draft_new(&self, old_proposal: Mail<Issue>) -> Result<Mail<Issue>, GeneralError> {
+    fn draft_new(&self, old_proposal: Mail<Issue>) -> Result<Mail<Issue>> {
         Ok(Mail::new(
             Proposer::my_address(),
             self.address_book()

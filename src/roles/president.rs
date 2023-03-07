@@ -2,11 +2,11 @@ use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
     connection::Connection,
-    error::GeneralError,
     mail::{Mail, MailBox},
     message::{Issue, IssueType},
     HALF_OF_VOTERS,
 };
+use anyhow::{anyhow, Result};
 
 use super::Roles;
 
@@ -28,15 +28,15 @@ impl President {
         "persident".to_string()
     }
 
-    /// 当收到提案时，生成提案表决记录，并且将提案分发至所有议员
-    fn process_proposal(&self, issue: Issue) -> Result<Issue, GeneralError> {
+    // 当收到提案时，生成提案表决记录，并且将提案分发至所有议员
+    fn process_proposal(&self, issue: Issue) -> Result<Issue> {
         self.count.borrow_mut().insert(issue.id(), 0);
         Ok(issue)
     }
 
-    /// 当收到投票时，为对应议案进行计票，如果票数过半，就生成议案交由书记记录
-    /// 当投票未过半，返回Error("not enough votes")
-    fn process_vote(&self, issue: Issue) -> Result<Issue, GeneralError> {
+    // 当收到投票时，为对应议案进行计票，如果票数过半，就生成议案交由书记记录
+    // 当投票未过半，返回Error("not enough votes")
+    fn process_vote(&self, issue: Issue) -> Result<Issue> {
         let mut cnt_table = self.count.borrow_mut();
         let current_issue_cnt = cnt_table.get(&issue.id());
         match current_issue_cnt {
@@ -50,13 +50,13 @@ impl President {
                         IssueType::Resolution,
                     ))
                 } else {
-                    Err("not enough votes".to_owned().into())
+                    Err(anyhow!("not enough votes"))
                 }
             }
             // 此决议已完成表决，或未有此决议的提案
-            None => Err("this proposal is not emmitted or finished"
-                .to_owned()
-                .into()),
+            None => Err(anyhow!(
+                "this proposal is either not emmitted or is finished"
+            )),
         }
     }
 }
@@ -78,7 +78,7 @@ impl Roles<Issue> for President {
         &(self.recv_box)
     }
 
-    fn draft_new(&self, old_proposal: Mail<Issue>) -> Result<Mail<Issue>, GeneralError> {
+    fn draft_new(&self, old_proposal: Mail<Issue>) -> Result<Mail<Issue>> {
         let role = self
             .roles(old_proposal.sender())
             .unwrap_or("error".to_string());
@@ -97,7 +97,7 @@ impl Roles<Issue> for President {
                     );
                     Ok(new_mail)
                 } else {
-                    Err(format!("recv a `Proposal` from {}", role).into())
+                    Err(anyhow!("recv a `Proposal` from {}", role))
                 }
             }
 
@@ -115,13 +115,13 @@ impl Roles<Issue> for President {
                     );
                     Ok(new_mail)
                 } else {
-                    Err(format!("recv a `Vote` from {}", role).into())
+                    Err(anyhow!("recv a `Vote` from {}", role))
                 }
             }
 
             IssueType::Resolution => {
                 log::warn!("President should not process Resolution, `DROP`");
-                Err("President should not process Resolution".to_string().into())
+                Err(anyhow!("President should not process Resolution"))
             }
         }
     }

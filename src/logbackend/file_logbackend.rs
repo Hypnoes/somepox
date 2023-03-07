@@ -1,8 +1,7 @@
 use std::{cell::RefCell, fs::File, io::Write};
 
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
-
-use crate::error::GeneralError;
 
 use super::Writable;
 
@@ -29,13 +28,13 @@ impl FileLogBackend {
 }
 
 impl Writable for FileLogBackend {
-    fn write(&self, data: Bytes) -> Result<(), GeneralError> {
+    fn write(&self, data: Bytes) -> Result<()> {
         match &(self.file) {
             Some(file_handler) => file_handler
                 .borrow_mut()
                 .write_all(&data)
                 .map_err(|e| e.into()),
-            None => Err("log file not open.".into()),
+            None => Err(anyhow!("log file not open.")),
         }
     }
 }

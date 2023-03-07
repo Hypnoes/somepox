@@ -1,11 +1,7 @@
-use std::{
-    cell::{BorrowMutError, RefCell},
-    collections::VecDeque,
-};
+use std::{cell::RefCell, collections::VecDeque};
 
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
-
-use crate::error::GeneralError;
 
 pub struct MailBox<Content>
 where
@@ -15,14 +11,14 @@ where
 }
 
 impl<Content: Clone + From<Bytes> + Into<Bytes>> MailBox<Content> {
-    pub fn get_mail(&self) -> Result<Mail<Content>, GeneralError> {
+    pub fn get_mail(&self) -> Result<Mail<Content>> {
         match self.mail_list.try_borrow_mut()?.pop_front() {
             Some(mail) => Ok(mail),
-            None => Err("MailBox is empty".into()),
+            None => Err(anyhow!("MailBox is empty")),
         }
     }
 
-    pub fn put_mail(&self, mail: Mail<Content>) -> Result<(), GeneralError> {
+    pub fn put_mail(&self, mail: Mail<Content>) -> Result<()> {
         Ok(self.mail_list.try_borrow_mut()?.push_back(mail))
     }
 }
@@ -70,11 +66,5 @@ where
 {
     fn from(value: (String, String, Bytes)) -> Self {
         Mail::new(value.0, value.1, value.2.into())
-    }
-}
-
-impl From<BorrowMutError> for GeneralError {
-    fn from(value: BorrowMutError) -> Self {
-        format!("{:?}", value).into()
     }
 }

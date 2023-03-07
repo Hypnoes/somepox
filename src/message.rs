@@ -1,7 +1,6 @@
 use std::fmt::Display;
 
 use bytes::Bytes;
-use log::error;
 
 #[derive(Debug, Clone)]
 pub struct Issue {
@@ -50,7 +49,7 @@ impl From<Bytes> for Issue {
                 }
             }
             Err(_) => {
-                error!("not a valid UTF-8 string");
+                log::error!("not a valid UTF-8 string");
                 Issue {
                     content: "".to_owned(),
                     id: 0,

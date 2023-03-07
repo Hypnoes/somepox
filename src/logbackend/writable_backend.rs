@@ -1,7 +1,7 @@
 use bytes::Bytes;
 
-use crate::error::GeneralError;
+use anyhow::Result;
 
 pub trait Writable {
-    fn write(&self, data: Bytes) -> Result<(), GeneralError>;
+    fn write(&self, data: Bytes) -> Result<()>;
 }

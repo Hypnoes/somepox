@@ -1,5 +1,4 @@
 pub mod connection;
-pub mod error;
 pub mod logbackend;
 pub mod mail;
 pub mod message;

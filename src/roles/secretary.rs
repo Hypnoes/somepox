@@ -1,12 +1,11 @@
-use std::collections::HashMap;
-
 use crate::{
     connection::Connection,
-    error::GeneralError,
     logbackend::Writable,
     mail::{Mail, MailBox},
     message::{Issue, IssueType},
 };
+use anyhow::{anyhow, Result};
+use std::collections::HashMap;
 
 use super::Roles;
 
@@ -24,7 +23,7 @@ where
 }
 
 impl<LogBackend: Writable> Secretary<LogBackend> {
-    fn write_to_log(&self, issue: Issue) -> Result<(), GeneralError> {
+    fn write_to_log(&self, issue: Issue) -> Result<()> {
         self.log_backend.write(issue.into())
     }
 }
@@ -46,7 +45,7 @@ impl<LogBackend: Writable> Roles<Issue> for Secretary<LogBackend> {
         &(self.recv_box)
     }
 
-    fn draft_new(&self, old_proposal: Mail<Issue>) -> Result<Mail<Issue>, GeneralError> {
+    fn draft_new(&self, old_proposal: Mail<Issue>) -> Result<Mail<Issue>> {
         let role = self
             .roles(old_proposal.sender())
             .unwrap_or("error".to_string());
@@ -54,18 +53,18 @@ impl<LogBackend: Writable> Roles<Issue> for Secretary<LogBackend> {
         match old_proposal.body().issue_type() {
             IssueType::Proposal => {
                 log::warn!("Secretary should not process proposals, `DROP`");
-                Err("Secretary should not process proposals".to_string().into())
+                Err(anyhow!("Secretary should not process proposals"))
             }
             IssueType::Vote => {
                 log::warn!("Secretary should not process votes, `DROP`");
-                Err("Secretary should not process votes".to_string().into())
+                Err(anyhow!("Secretary should not process votes"))
             }
             IssueType::Resolution => {
                 if role == "president".to_owned() {
                     self.write_to_log(old_proposal.body())?;
                     Ok(old_proposal)
                 } else {
-                    Err(format!("recv a `Resolution` from {}", role).into())
+                    Err(anyhow!("recv a `Resolution` from {}", role))
                 }
             }
         }

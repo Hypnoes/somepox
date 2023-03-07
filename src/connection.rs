@@ -3,7 +3,7 @@ use std::{net::SocketAddr, sync::Arc};
 use bytes::{Bytes, BytesMut};
 use tokio::net::UdpSocket;
 
-use crate::error::GeneralError;
+use anyhow::{anyhow, Result};
 
 pub struct Connection {
     host: String,
@@ -20,14 +20,14 @@ impl Connection {
         }
     }
 
-    pub async fn init(&mut self) -> Result<(), GeneralError> {
+    pub async fn init(&mut self) -> Result<()> {
         let addr = format!("{}:{}", self.host, self.port);
         let raw_bind = UdpSocket::bind(addr).await?;
         self.connection = Some(Arc::new(raw_bind));
         Ok(())
     }
 
-    pub fn close(&mut self) -> Result<(), GeneralError> {
+    pub fn close(&mut self) -> Result<()> {
         self.connection = None;
         Ok(())
     }
@@ -35,15 +35,8 @@ impl Connection {
     /// send a message
     ///
     /// FIXME: any message above 512 bytes will be dropped
-    pub async fn send(
-        &self,
-        address: &str,
-        data: Bytes,
-    ) -> Result<(String, String, usize), GeneralError> {
-        let addr = address
-            .to_owned()
-            .parse::<SocketAddr>()
-            .map_err(|e| GeneralError::from(e.to_string()))?;
+    pub async fn send(&self, address: &str, data: Bytes) -> Result<(String, String, usize)> {
+        let addr = address.to_owned().parse::<SocketAddr>()?;
 
         let maybe_sock = self.get_conn();
 
@@ -59,7 +52,7 @@ impl Connection {
             }
             None => {
                 log::error!("no connection available.");
-                Err("No Connection available.".to_owned().into())
+                Err(anyhow!("No Connection available."))
             }
         }
     }
@@ -67,7 +60,7 @@ impl Connection {
     /// recv message
     ///
     /// FIXME: any message above 512 bytes will be dropped
-    pub async fn recv(&self) -> Result<(String, String, Bytes), GeneralError> {
+    pub async fn recv(&self) -> Result<(String, String, Bytes)> {
         let mut msg = BytesMut::new();
         let maybe_sock = self.get_conn();
 
@@ -85,7 +78,7 @@ impl Connection {
             }
             None => {
                 log::error!("no connection available.");
-                Err("No Connection available.".to_owned().into())
+                Err(anyhow!("No Connection available."))
             }
         }
     }

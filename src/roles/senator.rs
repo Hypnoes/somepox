@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-
 use crate::{
     connection::Connection,
-    error::GeneralError,
     mail::{Mail, MailBox},
     message::{Issue, IssueType},
 };
+use anyhow::{anyhow, Result};
+use std::collections::HashMap;
 
 use super::Roles;
 
@@ -44,13 +43,13 @@ impl Roles<Issue> for Senator {
         &(self.recv_box)
     }
 
-    fn draft_new(&self, old_proposal: Mail<Issue>) -> Result<Mail<Issue>, GeneralError> {
+    fn draft_new(&self, old_proposal: Mail<Issue>) -> Result<Mail<Issue>> {
         let role = self
             .roles(old_proposal.sender())
             .unwrap_or("error".to_string());
 
         match old_proposal.body().issue_type() {
-            crate::message::IssueType::Proposal => {
+            IssueType::Proposal => {
                 if role == "president".to_owned() {
                     if old_proposal.body().id() > self.last_proposal_id {
                         Ok(Mail::new(
@@ -66,23 +65,18 @@ impl Roles<Issue> for Senator {
                             ),
                         ))
                     } else {
-                        Err(format!(
+                        Err(anyhow!(
                             "received expire issue {}, last issue is {}, drop.",
                             old_proposal.body().id(),
                             self.last_proposal_id
-                        )
-                        .into())
+                        ))
                     }
                 } else {
-                    Err(format!("recv a `Proposal` from {}", role).into())
+                    Err(anyhow!("recv a `Proposal` from {}", role))
                 }
             }
-            crate::message::IssueType::Vote => {
-                Err("Senator does not process issue: Vote".to_owned().into())
-            }
-            crate::message::IssueType::Resolution => {
-                Err("Senator does not process issue: Vote".to_owned().into())
-            }
+            IssueType::Vote => Err(anyhow!("Senator does not process issue: Vote")),
+            IssueType::Resolution => Err(anyhow!("Senator does not process issue: Vote")),
         }
     }
 }
