@@ -6,7 +6,7 @@ use crate::{
     message::{Issue, IssueType},
     HALF_OF_VOTERS,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Result};
 
 use super::Roles;
 
@@ -86,37 +86,35 @@ impl Roles<Issue> for President {
         match old_proposal.body().issue_type() {
             // 将提案分发至所有议员进行表决
             IssueType::Proposal => {
-                if role == "proposer".to_owned() {
-                    let new_mail = Mail::new(
-                        President::my_address(),
-                        self.address_book
-                            .get("senator")
-                            .map(|senators| senators.join(","))
-                            .unwrap_or("".to_string()),
-                        self.process_proposal(old_proposal.body())?,
-                    );
-                    Ok(new_mail)
-                } else {
-                    Err(anyhow!("recv a `Proposal` from {}", role))
-                }
+                ensure!(
+                    role == "proposer".to_owned(),
+                    "recv a `Proposal` from {}",
+                    role
+                );
+
+                Ok(Mail::new(
+                    President::my_address(),
+                    self.address_book
+                        .get("senator")
+                        .map(|senators| senators.join(","))
+                        .unwrap_or("".to_string()),
+                    self.process_proposal(old_proposal.body())?,
+                ))
             }
 
             // 将表决结果进行计票，超过半数则通过决议交由书记记录
             // NOTE: 当机票结果未过半时，会产生 GeneralError("not enough votes") 以此判断是否产生决议。
             IssueType::Vote => {
-                if role == "senator".to_owned() {
-                    let new_mail = Mail::new(
-                        President::my_address(),
-                        self.address_book
-                            .get("secretary")
-                            .map(|secretaries| secretaries.join(","))
-                            .unwrap_or("".to_string()),
-                        self.process_vote(old_proposal.body())?,
-                    );
-                    Ok(new_mail)
-                } else {
-                    Err(anyhow!("recv a `Vote` from {}", role))
-                }
+                ensure!(role == "senator".to_owned(), "recv a `Vote` from {}", role);
+
+                Ok(Mail::new(
+                    President::my_address(),
+                    self.address_book
+                        .get("secretary")
+                        .map(|secretaries| secretaries.join(","))
+                        .unwrap_or("".to_string()),
+                    self.process_vote(old_proposal.body())?,
+                ))
             }
 
             IssueType::Resolution => {
