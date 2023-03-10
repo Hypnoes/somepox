@@ -21,7 +21,6 @@
 use std::{
     cell::RefCell,
     collections::{BTreeMap, LinkedList},
-    fmt::{Display, Formatter},
 };
 
 use bytes::Bytes;
@@ -55,35 +54,42 @@ impl Writable for HeapLogBackend {
     }
 }
 
-impl Display for HeapLogBackend {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        fn format_list(list: &LinkedList<Bytes>) -> String {
-            let result = String::from("[");
-
-            let content: String = list
-                .iter()
-                .flat_map(|item| String::from_utf8((&item).to_vec()))
-                .map(|str| str + ",")
-                .collect();
-
-            let content_len = content.len();
-
-            result + &content[0..(content_len - 1)] + "]"
-        }
-
-        let mut tb_v = vec![("k  v").to_owned()];
-        for (k, v) in self.table.borrow().iter() {
-            let line = format!("{}: {}", k, format_list(&v.borrow()));
-            tb_v.push(line);
-        }
-        write!(f, "{}", tb_v.join("\n"))
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use bytes::Bytes;
+
     use crate::logbackend::HeapLogBackend;
     use crate::logbackend::Writable;
+
+    use std::collections::LinkedList;
+    use std::fmt::{Display, Formatter, Result as FmtResult};
+
+    impl Display for HeapLogBackend {
+        fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+            fn format_list(list: &LinkedList<Bytes>) -> String {
+                let result = String::from("[");
+
+                let content: String = list
+                    .iter()
+                    .flat_map(|item| String::from_utf8((&item).to_vec()))
+                    .map(|str| str + ",")
+                    .collect();
+
+                let content_len = content.len();
+
+                result + &content[0..(content_len - 1)] + "]"
+            }
+
+            let table_view: Vec<String> = self
+                .table
+                .borrow()
+                .iter()
+                .map(|(id, version_his)| format!("{}: {}", id, format_list(&version_his.borrow())))
+                .collect();
+
+            write!(f, "{}", table_view.join("\n"))
+        }
+    }
 
     #[test]
     fn heap_logbackend_new_test() {
