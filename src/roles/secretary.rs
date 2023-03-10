@@ -24,7 +24,8 @@ where
 
 impl<LogBackend: Writable> Secretary<LogBackend> {
     fn write_to_log(&self, issue: Issue) -> Result<()> {
-        self.log_backend.write(issue.into())
+        self.log_backend
+            .write(issue.id().into(), issue.content().into())
     }
 }
 

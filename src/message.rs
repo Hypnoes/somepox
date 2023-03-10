@@ -18,16 +18,16 @@ impl Issue {
         }
     }
 
-    pub fn content(&self) -> &str {
-        &self.content
+    pub fn content(&self) -> String {
+        self.content.clone()
     }
 
     pub fn id(&self) -> u32 {
-        self.id
+        self.id.clone()
     }
 
-    pub fn issue_type(&self) -> &IssueType {
-        &self.issue_type
+    pub fn issue_type(&self) -> IssueType {
+        self.issue_type.clone()
     }
 }
 

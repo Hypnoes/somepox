@@ -71,21 +71,18 @@ where
     }
 
     /**
+     * FIXME - 这个建模流程有问题，如 *proposer* 和 *secretary* 这两个角色都不遵循这个流程
+
         典型的角色工作流程：
 
         1. 接收阶段：
-        1-1. ☑️ 接受消息
-        1-2. ☑️ 反序列化消息至 Proposal
-        1-3. ☑️ 将消息投入至收件箱
+        接受消息 ➡️ 反序列化消息至 Proposal ➡️ 将消息投入至收件箱
 
         2. 处理阶段：
-        2-1. ☑️ 从邮箱取出消息
-        2-2. ☑️ 处理消息，进行表决
-        2-3. ☑️ 将表决结果投入至发件箱
+        从邮箱取出消息 ➡️ 处理消息，进行表决 ➡️ 将表决结果投入至发件箱
 
         3. 发送阶段：
-        3-1. ☑️ 从发件箱取出消息
-        3-2. ☑️ 发送消息
+        从发件箱取出消息 ➡️ 发送消息
     */
     async fn do_work(&self) -> Result<()> {
         self.rcv_msg().await?;
@@ -94,6 +91,9 @@ where
         Ok(())
     }
 
+    /**
+     * 帮助函数：通过地址确定发件人身份
+     */
     fn roles(&self, address: String) -> Option<String> {
         for (role_id, role_address) in self.address_book().iter() {
             if role_address.contains(&address) {

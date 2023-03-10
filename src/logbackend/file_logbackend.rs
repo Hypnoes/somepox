@@ -28,7 +28,7 @@ impl FileLogBackend {
 }
 
 impl Writable for FileLogBackend {
-    fn write(&self, data: Bytes) -> Result<()> {
+    fn write(&self, _id: u64, data: Bytes) -> Result<()> {
         match &(self.file) {
             Some(file_handler) => file_handler
                 .borrow_mut()
