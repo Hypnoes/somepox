@@ -1,5 +1,5 @@
 use crate::{
-    connection::Connection,
+    connection::{Connection, HostAndPort},
     logbackend::Writable,
     mail::{Mail, MailBox},
     message::{Issue, IssueType},
@@ -23,6 +23,20 @@ where
 }
 
 impl<LogBackend: Writable> Secretary<LogBackend> {
+    pub fn new(
+        address_book: HashMap<String, Vec<String>>,
+        endpoint: HostAndPort,
+        log_backend: LogBackend,
+    ) -> Self {
+        Secretary {
+            address_book,
+            send_box: MailBox::new(),
+            recv_box: MailBox::new(),
+            connection: Connection::new(endpoint),
+            log_backend,
+        }
+    }
+
     fn write_to_log(&self, issue: Issue) -> Result<()> {
         self.log_backend
             .write(issue.id().into(), issue.content().into())
@@ -61,7 +75,7 @@ impl<LogBackend: Writable> Roles<Issue> for Secretary<LogBackend> {
                 Err(anyhow!("Secretary should not process votes"))
             }
             IssueType::Resolution => {
-                if role == "president".to_owned() {
+                if &role == "president" {
                     self.write_to_log(old_proposal.body())?;
                     Ok(old_proposal)
                 } else {

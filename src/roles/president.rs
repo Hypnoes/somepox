@@ -1,14 +1,14 @@
 use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
-    connection::Connection,
+    connection::{Connection, HostAndPort},
     mail::{Mail, MailBox},
     message::{Issue, IssueType},
     HALF_OF_VOTERS,
 };
 use anyhow::{anyhow, ensure, Result};
 
-use super::Roles;
+use super::{Roles, PRESIDENT_ROLE_NAME};
 
 /// 议长：
 /// 1. 从 *提议者(Proposer)* 接受 *提案(Proposol)*
@@ -24,8 +24,18 @@ pub struct President {
 }
 
 impl President {
+    pub fn new(address_book: HashMap<String, Vec<String>>, endpoint: HostAndPort) -> Self {
+        Self {
+            address_book,
+            send_box: MailBox::new(),
+            recv_box: MailBox::new(),
+            connection: Connection::new(endpoint),
+            count: RefCell::new(HashMap::new()),
+        }
+    }
+
     fn my_address() -> String {
-        "persident".to_string()
+        PRESIDENT_ROLE_NAME.to_string()
     }
 
     // 当收到提案时，生成提案表决记录，并且将提案分发至所有议员

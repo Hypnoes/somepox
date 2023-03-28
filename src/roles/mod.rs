@@ -6,6 +6,7 @@ use bytes::Bytes;
 
 use crate::{
     connection::Connection,
+    logbackend::Writable,
     mail::{Mail, MailBox},
 };
 
@@ -22,7 +23,7 @@ pub use crate::roles::senator::Senator;
 #[async_trait]
 trait Roles<Proposal>
 where
-    Proposal: Clone + From<Bytes> + Into<Bytes> + std::marker::Send + std::marker::Sync,
+    Proposal: Clone + TryFrom<Bytes> + Into<Bytes> + std::marker::Send + std::marker::Sync,
 {
     fn address_book(&self) -> &HashMap<String, Vec<String>>;
     fn msg_pipe(&self) -> &Connection;
@@ -52,7 +53,7 @@ where
     */
     async fn rcv_msg(&self) -> Result<()> {
         let new_msg = self.msg_pipe().recv().await?;
-        self.recv_box().put_mail(new_msg.into())
+        self.recv_box().put_mail(new_msg.try_into()?)
     }
 
     /**
@@ -103,3 +104,32 @@ where
         None
     }
 }
+
+pub fn new_president(addr_book: HashMap<String, Vec<String>>, endpoint: &str) -> Result<President> {
+    let host_and_port = endpoint.try_into()?;
+    Ok(President::new(addr_book, host_and_port))
+}
+
+pub fn new_proposer(addr_book: HashMap<String, Vec<String>>, endpoint: &str) -> Result<Proposer> {
+    let host_and_port = endpoint.try_into()?;
+    Ok(Proposer::new(addr_book, host_and_port))
+}
+
+pub fn new_secretary<LogBackend: Writable>(
+    addr_book: HashMap<String, Vec<String>>,
+    endpoint: &str,
+    log_backend: LogBackend,
+) -> Result<Secretary<LogBackend>> {
+    let host_and_port = endpoint.try_into()?;
+    Ok(Secretary::new(addr_book, host_and_port, log_backend))
+}
+
+pub fn new_senator(addr_book: HashMap<String, Vec<String>>, endpoint: &str) -> Result<Senator> {
+    let host_and_port = endpoint.try_into()?;
+    Ok(Senator::new(addr_book, host_and_port))
+}
+
+pub const PRESIDENT_ROLE_NAME: &str = "President";
+pub const PROPOSER_ROLE_NAME: &str = "Proposer";
+pub const SECRETARY_ROLE_NAME: &str = "Secretary";
+pub const SENATOR_ROLE_NAME: &str = "Senator";

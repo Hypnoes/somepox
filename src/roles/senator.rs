@@ -1,12 +1,12 @@
 use crate::{
-    connection::Connection,
+    connection::{Connection, HostAndPort},
     mail::{Mail, MailBox},
     message::{Issue, IssueType},
 };
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
-use super::Roles;
+use super::{Roles, SENATOR_ROLE_NAME};
 
 /// 议员：
 /// 1. 对 *议长(President)* 下发的 *议题(Proposal)* 进行投票
@@ -21,8 +21,18 @@ pub struct Senator {
 }
 
 impl Senator {
+    pub fn new(address_book: HashMap<String, Vec<String>>, endpoint: HostAndPort) -> Self {
+        Self {
+            address_book,
+            send_box: MailBox::new(),
+            recv_box: MailBox::new(),
+            connection: Connection::new(endpoint),
+            last_proposal_id: 0,
+        }
+    }
+
     fn my_address() -> String {
-        String::from("???")
+        SENATOR_ROLE_NAME.to_string()
     }
 }
 

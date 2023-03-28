@@ -5,6 +5,40 @@ use tokio::net::UdpSocket;
 
 use anyhow::{anyhow, Result};
 
+pub struct HostAndPort(pub String, pub u16);
+
+impl TryFrom<String> for HostAndPort {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
+impl TryFrom<&str> for HostAndPort {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+        let parts: Vec<&str> = value.split(':').collect();
+
+        if parts.len() != 2 {
+            return Err(anyhow!("invalid host:port"));
+        } else {
+            let host = parts[0].to_string();
+            if host.is_empty() {
+                return Err(anyhow!("host is empty"));
+            }
+
+            let port = parts[1].parse::<u16>()?;
+            if port < 5000 {
+                return Err(anyhow!("port is beyond 5000"));
+            }
+
+            Ok(Self(host, port))
+        }
+    }
+}
+
 pub struct Connection {
     host: String,
     port: u16,
@@ -12,10 +46,10 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn new(host: &str, port: u16) -> Connection {
+    pub fn new(endpoint: HostAndPort) -> Connection {
         Connection {
-            host: host.to_string(),
-            port: port,
+            host: endpoint.0,
+            port: endpoint.1,
             connection: None,
         }
     }

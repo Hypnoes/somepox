@@ -5,12 +5,18 @@ use bytes::Bytes;
 
 pub struct MailBox<Content>
 where
-    Content: Clone + From<Bytes> + Into<Bytes>,
+    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
 {
     mail_list: RefCell<VecDeque<Mail<Content>>>,
 }
 
-impl<Content: Clone + From<Bytes> + Into<Bytes>> MailBox<Content> {
+impl<Content: Clone + TryFrom<Bytes> + Into<Bytes>> MailBox<Content> {
+    pub fn new() -> Self {
+        MailBox {
+            mail_list: RefCell::new(VecDeque::new()),
+        }
+    }
+
     pub fn get_mail(&self) -> Result<Mail<Content>> {
         match self.mail_list.try_borrow_mut()?.pop_front() {
             Some(mail) => Ok(mail),
@@ -25,14 +31,14 @@ impl<Content: Clone + From<Bytes> + Into<Bytes>> MailBox<Content> {
 
 pub struct Mail<Content>
 where
-    Content: Clone + From<Bytes> + Into<Bytes>,
+    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
 {
     from: String,
     to: String,
     body: Box<Content>,
 }
 
-impl<Content: Clone + From<Bytes> + Into<Bytes>> Mail<Content> {
+impl<Content: Clone + TryFrom<Bytes> + Into<Bytes>> Mail<Content> {
     pub fn new(from: String, to: String, content: Content) -> Mail<Content> {
         Mail {
             from,
@@ -60,11 +66,18 @@ impl<Content: Clone + From<Bytes> + Into<Bytes>> Mail<Content> {
     }
 }
 
-impl<Content> From<(String, String, Bytes)> for Mail<Content>
+impl<Content> TryFrom<(String, String, Bytes)> for Mail<Content>
 where
-    Content: Clone + From<Bytes> + Into<Bytes>,
+    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
 {
-    fn from(value: (String, String, Bytes)) -> Self {
-        Mail::new(value.0, value.1, value.2.into())
+    type Error = anyhow::Error;
+
+    fn try_from(value: (String, String, Bytes)) -> std::result::Result<Self, Self::Error> {
+        Ok(Mail::new(
+            value.0,
+            value.1,
+            Content::try_from(value.2)
+                .map_err(|_| anyhow!("can not deserialize bytes into Main::Content"))?,
+        ))
     }
 }

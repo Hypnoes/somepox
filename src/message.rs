@@ -31,31 +31,32 @@ impl Issue {
     }
 }
 
-impl From<Bytes> for Issue {
-    fn from(bytes: Bytes) -> Self {
-        let formatted_issue_string = String::from_utf8(bytes.to_vec());
+impl TryFrom<Bytes> for Issue {
+    type Error = anyhow::Error;
 
-        match formatted_issue_string {
-            Ok(raw_issue_content) => {
-                let parts: Vec<&str> = raw_issue_content.split("|").collect();
-                let it = IssueType::from(parts[0]);
-                let id = u32::from_str_radix(parts[1], 10).unwrap_or(0);
-                let ct = parts[2].to_string();
+    fn try_from(value: Bytes) -> Result<Self, Self::Error> {
+        let raw_issue_content = String::from_utf8(value.to_vec())
+            .map_err(|_| anyhow::anyhow!("Failed to convert bytes to string"))?;
 
-                Issue {
-                    content: ct,
-                    id: id,
-                    issue_type: it,
-                }
-            }
-            Err(_) => {
-                log::error!("not a valid UTF-8 string");
-                Issue {
-                    content: "".to_owned(),
-                    id: 0,
-                    issue_type: IssueType::Proposal,
-                }
-            }
+        let parts: Vec<&str> = raw_issue_content.split("|").collect();
+
+        if parts.len() != 3 {
+            return Err(anyhow::anyhow!(
+                "Invalid issue format, expected 3 parts, got {}",
+                parts.len()
+            ));
+        } else {
+            let parts: Vec<&str> = raw_issue_content.split("|").collect();
+
+            let it = IssueType::try_from(parts[0])?;
+            let id = u32::from_str_radix(parts[1], 10)?;
+            let ct = parts[2];
+
+            Ok(Issue {
+                content: ct.to_owned(),
+                id: id,
+                issue_type: it,
+            })
         }
     }
 }
@@ -101,19 +102,22 @@ impl Into<String> for IssueType {
     }
 }
 
-impl From<&str> for IssueType {
-    fn from(s: &str) -> Self {
-        match s {
-            "r" => IssueType::Resolution,
-            "v" => IssueType::Vote,
-            "p" => IssueType::Proposal,
-            _ => panic!("not a valid issue_type"),
+impl TryFrom<&str> for IssueType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "r" => Ok(IssueType::Resolution),
+            "v" => Ok(IssueType::Vote),
+            "p" => Ok(IssueType::Proposal),
+            _ => Err(anyhow::anyhow!("not a valid issue_type")),
         }
     }
 }
+impl TryFrom<String> for IssueType {
+    type Error = anyhow::Error;
 
-impl From<String> for IssueType {
-    fn from(s: String) -> Self {
-        IssueType::from(s.as_str())
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        IssueType::try_from(value.as_str())
     }
 }

@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use crate::{
-    connection::Connection,
+    connection::{Connection, HostAndPort},
     mail::{Mail, MailBox},
     message::{Issue, IssueType},
 };
 use anyhow::Result;
 
-use super::Roles;
+use super::{Roles, PROPOSER_ROLE_NAME};
 
 /// 提案者：
 /// 提交 *议案(Proposal)* 至 *议长(President)* ，由 *议长* 添加进待议列表
@@ -20,8 +20,18 @@ pub struct Proposer {
 }
 
 impl Proposer {
+    pub fn new(address_book: HashMap<String, Vec<String>>, endpoint: HostAndPort) -> Self {
+        Self {
+            address_book,
+            send_box: MailBox::new(),
+            recv_box: MailBox::new(),
+            connection: Connection::new(endpoint),
+            counter: 0,
+        }
+    }
+
     fn my_address() -> String {
-        String::from("0x0000000000000000000000000000000000000000")
+        PROPOSER_ROLE_NAME.to_string()
     }
 }
 
