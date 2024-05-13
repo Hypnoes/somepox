@@ -3,28 +3,28 @@ use std::{cell::RefCell, collections::VecDeque};
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 
-pub struct MailBox<Content>
+pub struct MailBox<Message>
 where
-    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
+    Message: Clone + TryFrom<Bytes> + Into<Bytes>,
 {
-    mail_list: RefCell<VecDeque<Mail<Content>>>,
+    mail_list: RefCell<VecDeque<Mail<Message>>>,
 }
 
-impl<Content: Clone + TryFrom<Bytes> + Into<Bytes>> MailBox<Content> {
+impl<Message: Clone + TryFrom<Bytes> + Into<Bytes>> MailBox<Message> {
     pub fn new() -> Self {
         MailBox {
             mail_list: RefCell::new(VecDeque::new()),
         }
     }
 
-    pub fn get_mail(&self) -> Result<Mail<Content>> {
+    pub fn get_mail(&self) -> Result<Mail<Message>> {
         match self.mail_list.try_borrow_mut()?.pop_front() {
             Some(mail) => Ok(mail),
             None => Err(anyhow!("MailBox is empty")),
         }
     }
 
-    pub fn put_mail(&self, mail: Mail<Content>) -> Result<()> {
+    pub fn put_mail(&self, mail: Mail<Message>) -> Result<()> {
         Ok(self.mail_list.try_borrow_mut()?.push_back(mail))
     }
 }

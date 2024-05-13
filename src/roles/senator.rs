@@ -1,8 +1,8 @@
-use super::{Roles, SENATOR_ROLE_NAME};
+use super::{AddressBook, Roles, SENATOR_ROLE_NAME};
 use crate::{
     connection::{Connection, HostAndPort},
+    issue::{Issue, IssueType},
     mail::{Mail, MailBox},
-    message::{Issue, IssueType},
 };
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
@@ -12,7 +12,7 @@ use std::collections::HashMap;
 /// 2. 如果当前议题的 *编号(id)* 大于已处理的 *编号(id)* ，同意该提案；否则拒绝
 /// 3. 回复投票结果至 *议长(President)*
 pub struct Senator {
-    address_book: HashMap<String, Vec<String>>,
+    address_book: AddressBook,
     send_box: MailBox<Issue>,
     recv_box: MailBox<Issue>,
     connection: Connection,
@@ -20,7 +20,7 @@ pub struct Senator {
 }
 
 impl Senator {
-    pub fn new(address_book: HashMap<String, Vec<String>>, endpoint: HostAndPort) -> Self {
+    pub fn new(address_book: AddressBook, endpoint: HostAndPort) -> Self {
         Self {
             address_book,
             send_box: MailBox::new(),
@@ -36,7 +36,7 @@ impl Senator {
 }
 
 impl Roles<Issue> for Senator {
-    fn address_book(&self) -> &HashMap<String, Vec<String>> {
+    fn address_book(&self) -> &AddressBook {
         &(self.address_book)
     }
 

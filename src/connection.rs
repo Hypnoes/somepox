@@ -70,9 +70,7 @@ impl Connection {
     pub async fn send(&self, address: &str, data: Bytes) -> Result<(String, String, usize)> {
         let addr = address.to_owned().parse::<SocketAddr>()?;
 
-        let maybe_sock = self.get_conn();
-
-        match maybe_sock {
+        match self.get_conn() {
             Some(sock) => {
                 let buffer: &[u8] = &data;
                 let record_size = sock.try_send_to(buffer, addr)?;

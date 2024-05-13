@@ -1,9 +1,9 @@
-use super::Roles;
+use super::{AddressBook, Roles};
 use crate::{
     connection::{Connection, HostAndPort},
+    issue::{Issue, IssueType},
     logbackend::Writable,
     mail::{Mail, MailBox},
-    message::{Issue, IssueType},
 };
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
@@ -14,7 +14,7 @@ pub struct Secretary<LogBackend>
 where
     LogBackend: Writable,
 {
-    address_book: HashMap<String, Vec<String>>,
+    address_book: AddressBook,
     send_box: MailBox<Issue>,
     recv_box: MailBox<Issue>,
     connection: Connection,
@@ -22,11 +22,7 @@ where
 }
 
 impl<LogBackend: Writable> Secretary<LogBackend> {
-    pub fn new(
-        address_book: HashMap<String, Vec<String>>,
-        endpoint: HostAndPort,
-        log_backend: LogBackend,
-    ) -> Self {
+    pub fn new(address_book: AddressBook, endpoint: HostAndPort, log_backend: LogBackend) -> Self {
         Secretary {
             address_book,
             send_box: MailBox::new(),
@@ -35,15 +31,10 @@ impl<LogBackend: Writable> Secretary<LogBackend> {
             log_backend,
         }
     }
-
-    fn write_to_log(&self, issue: Issue) -> Result<()> {
-        self.log_backend
-            .write(issue.id().into(), issue.content().into())
-    }
 }
 
 impl<LogBackend: Writable> Roles<Issue> for Secretary<LogBackend> {
-    fn address_book(&self) -> &HashMap<String, Vec<String>> {
+    fn address_book(&self) -> &AddressBook {
         &(self.address_book)
     }
 
@@ -60,6 +51,11 @@ impl<LogBackend: Writable> Roles<Issue> for Secretary<LogBackend> {
     }
 
     fn draft_new(&self, old_proposal: Mail<Issue>) -> Result<Mail<Issue>> {
+        let write_to_log = |issue: Issue| {
+            self.log_backend
+                .write(issue.id().into(), issue.content().into())
+        };
+
         let role = self
             .roles(old_proposal.sender())
             .unwrap_or("error".to_string());
@@ -75,12 +71,19 @@ impl<LogBackend: Writable> Roles<Issue> for Secretary<LogBackend> {
             }
             IssueType::Resolution => {
                 if &role == "president" {
-                    self.write_to_log(old_proposal.body())?;
+                    write_to_log(old_proposal.body())?;
                     Ok(old_proposal)
                 } else {
                     Err(anyhow!("recv a `Resolution` from {}", role))
                 }
             }
         }
+    }
+
+    async fn do_work(&self) -> Result<()> {
+        let new_msg = self.msg_pipe().recv().await?;
+        self.recv_box().put_mail(new_msg.try_into()?)?;
+        self.draft_new(self.recv_box().get_mail()?)?;
+        Ok(())
     }
 }

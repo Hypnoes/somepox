@@ -1,8 +1,8 @@
-use super::{Roles, PRESIDENT_ROLE_NAME};
+use super::{AddressBook, Roles, PRESIDENT_ROLE_NAME};
 use crate::{
     connection::{Connection, HostAndPort},
+    issue::{Issue, IssueType},
     mail::{Mail, MailBox},
-    message::{Issue, IssueType},
     HALF_OF_VOTERS,
 };
 use anyhow::{anyhow, ensure, Result};
@@ -14,7 +14,7 @@ use std::{cell::RefCell, collections::HashMap};
 /// 3. 将 *表决(Vote)* 结果收回，*唱票(Counting)*
 /// 4. 将投票结果交由 *书记(Secretary)* 记录在案形成最终 *决议(Resolution)*
 pub struct President {
-    address_book: HashMap<String, Vec<String>>,
+    address_book: AddressBook,
     send_box: MailBox<Issue>,
     recv_box: MailBox<Issue>,
     connection: Connection,
@@ -22,7 +22,7 @@ pub struct President {
 }
 
 impl President {
-    pub fn new(address_book: HashMap<String, Vec<String>>, endpoint: HostAndPort) -> Self {
+    pub fn new(address_book: AddressBook, endpoint: HostAndPort) -> Self {
         Self {
             address_book,
             send_box: MailBox::new(),
@@ -62,15 +62,13 @@ impl President {
                 }
             }
             // 此决议已完成表决，或未有此决议的提案
-            None => Err(anyhow!(
-                "this proposal is either not emmitted or is finished"
-            )),
+            None => Err(anyhow!("this proposal is either not emmitted or finished")),
         }
     }
 }
 
 impl Roles<Issue> for President {
-    fn address_book(&self) -> &HashMap<String, Vec<String>> {
+    fn address_book(&self) -> &AddressBook {
         &(self.address_book)
     }
 
