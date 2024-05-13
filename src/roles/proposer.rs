@@ -1,13 +1,11 @@
-use std::collections::HashMap;
-
+use super::{Roles, PROPOSER_ROLE_NAME};
 use crate::{
     connection::{Connection, HostAndPort},
     mail::{Mail, MailBox},
     message::{Issue, IssueType},
 };
 use anyhow::Result;
-
-use super::{Roles, PROPOSER_ROLE_NAME};
+use std::collections::HashMap;
 
 /// 提案者：
 /// 提交 *议案(Proposal)* 至 *议长(President)* ，由 *议长* 添加进待议列表

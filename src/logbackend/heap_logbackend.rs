@@ -18,15 +18,13 @@
 //!
 //!
 
+use crate::logbackend::Writable;
+use anyhow::Result;
+use bytes::Bytes;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, LinkedList},
 };
-
-use bytes::Bytes;
-
-use super::Writable;
-use anyhow::Result;
 
 pub struct HeapLogBackend {
     table: RefCell<BTreeMap<u64, RefCell<LinkedList<Bytes>>>>,
@@ -56,11 +54,9 @@ impl Writable for HeapLogBackend {
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
-
     use crate::logbackend::HeapLogBackend;
     use crate::logbackend::Writable;
-
+    use bytes::Bytes;
     use std::collections::LinkedList;
     use std::fmt::{Display, Formatter, Result as FmtResult};
 

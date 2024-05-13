@@ -1,3 +1,4 @@
+use super::Roles;
 use crate::{
     connection::{Connection, HostAndPort},
     logbackend::Writable,
@@ -6,8 +7,6 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
-
-use super::Roles;
 
 /// 书记：
 /// 将议题 *决定(Resolution)* 写入记录中

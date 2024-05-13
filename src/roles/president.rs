@@ -1,5 +1,4 @@
-use std::{cell::RefCell, collections::HashMap};
-
+use super::{Roles, PRESIDENT_ROLE_NAME};
 use crate::{
     connection::{Connection, HostAndPort},
     mail::{Mail, MailBox},
@@ -7,8 +6,7 @@ use crate::{
     HALF_OF_VOTERS,
 };
 use anyhow::{anyhow, ensure, Result};
-
-use super::{Roles, PRESIDENT_ROLE_NAME};
+use std::{cell::RefCell, collections::HashMap};
 
 /// 议长：
 /// 1. 从 *提议者(Proposer)* 接受 *提案(Proposol)*

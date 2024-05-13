@@ -1,9 +1,7 @@
-use std::{net::SocketAddr, sync::Arc};
-
-use bytes::{Bytes, BytesMut};
-use tokio::net::UdpSocket;
-
 use anyhow::{anyhow, Result};
+use bytes::{Bytes, BytesMut};
+use std::{net::SocketAddr, sync::Arc};
+use tokio::net::UdpSocket;
 
 pub struct HostAndPort(pub String, pub u16);
 

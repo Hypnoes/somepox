@@ -1,14 +1,12 @@
-use std::collections::HashMap;
-
-use anyhow::Result;
-use async_trait::async_trait;
-use bytes::Bytes;
-
 use crate::{
     connection::Connection,
     logbackend::Writable,
     mail::{Mail, MailBox},
 };
+use anyhow::Result;
+use async_trait::async_trait;
+use bytes::Bytes;
+use std::collections::HashMap;
 
 mod president;
 mod proposer;
@@ -72,9 +70,8 @@ where
     }
 
     /**
-     * FIXME - 这个建模流程有问题，如 *proposer* 和 *secretary* 这两个角色都不遵循这个流程
-
-        典型的角色工作流程：
+     *  FIXME: 这个建模流程有问题，如 *proposer* 和 *secretary* 这两个角色都不遵循这个流程
+     *  典型的角色工作流程：
 
         1. 接收阶段：
         接受消息 ➡️ 反序列化消息至 Proposal ➡️ 将消息投入至收件箱

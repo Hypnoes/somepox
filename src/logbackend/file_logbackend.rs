@@ -2,12 +2,10 @@
 //! Use File to Store Log
 //!
 
-use std::{fs::File, io::Write};
-
+use super::Writable;
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
-
-use super::Writable;
+use std::{fs::File, io::Write};
 
 pub struct FileLogBackend {
     file_name: String,
@@ -39,13 +37,10 @@ impl Writable for FileLogBackend {
 
 #[cfg(test)]
 mod tests {
-    use std::{fmt::Display, fs, path::Path};
-
-    use anyhow::Result;
-
-    use crate::logbackend::Writable;
-
     use super::FileLogBackend;
+    use crate::logbackend::Writable;
+    use anyhow::Result;
+    use std::{fmt::Display, fs, path::Path};
 
     impl Display for FileLogBackend {
         fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

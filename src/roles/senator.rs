@@ -1,3 +1,4 @@
+use super::{Roles, SENATOR_ROLE_NAME};
 use crate::{
     connection::{Connection, HostAndPort},
     mail::{Mail, MailBox},
@@ -5,8 +6,6 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use std::collections::HashMap;
-
-use super::{Roles, SENATOR_ROLE_NAME};
 
 /// 议员：
 /// 1. 对 *议长(President)* 下发的 *议题(Proposal)* 进行投票
