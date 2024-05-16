@@ -93,7 +93,7 @@ impl Roles<Issue> for President {
             // 将提案分发至所有议员进行表决
             IssueType::Proposal => {
                 ensure!(
-                    role == "proposer".to_owned(),
+                    role == "proposer".to_string(),
                     "recv a `Proposal` from {}",
                     role
                 );
@@ -111,7 +111,7 @@ impl Roles<Issue> for President {
             // 将表决结果进行计票，超过半数则通过决议交由书记记录
             // NOTE: 当机票结果未过半时，会产生 GeneralError("not enough votes") 以此判断是否产生决议。
             IssueType::Vote => {
-                ensure!(role == "senator".to_owned(), "recv a `Vote` from {}", role);
+                ensure!(role == "senator".to_string(), "recv a `Vote` from {}", role);
 
                 Ok(Mail::new(
                     President::my_address(),

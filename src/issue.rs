@@ -53,7 +53,7 @@ impl TryFrom<Bytes> for Issue {
             let ct = parts[2];
 
             Ok(Issue {
-                content: ct.to_owned(),
+                content: ct.to_string(),
                 id: id,
                 issue_type: it,
             })
@@ -95,9 +95,9 @@ impl Display for IssueType {
 impl Into<String> for IssueType {
     fn into(self) -> String {
         match self {
-            IssueType::Proposal => "p".to_owned(),
-            IssueType::Vote => "v".to_owned(),
-            IssueType::Resolution => "r".to_owned(),
+            IssueType::Proposal => "p".to_string(),
+            IssueType::Vote => "v".to_string(),
+            IssueType::Resolution => "r".to_string(),
         }
     }
 }

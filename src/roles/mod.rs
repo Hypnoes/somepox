@@ -34,7 +34,6 @@ where
     fn draft_new(&self, old_proposal: Mail<Proposal>) -> Result<Mail<Proposal>>;
 
     /**
-     *  NOTE: 这个建模流程有问题， *proposer* 和 *secretary* 这两个角色不遵循这个流程
      *  典型的角色工作流程：
 
         1. 接收阶段：

@@ -3,11 +3,11 @@ use std::{cell::RefCell, collections::VecDeque};
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 
-pub struct MailBox<Message>
+pub struct MailBox<Content>
 where
-    Message: Clone + TryFrom<Bytes> + Into<Bytes>,
+    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
 {
-    mail_list: RefCell<VecDeque<Mail<Message>>>,
+    mail_list: RefCell<VecDeque<Mail<Content>>>,
 }
 
 impl<Message: Clone + TryFrom<Bytes> + Into<Bytes>> MailBox<Message> {
@@ -59,7 +59,7 @@ impl<Content: Clone + TryFrom<Bytes> + Into<Bytes>> Mail<Content> {
         let mut rcs_v: Vec<String> = Vec::new();
 
         for rcs in self.to.split(",").into_iter() {
-            rcs_v.push(rcs.to_owned());
+            rcs_v.push(rcs.to_string());
         }
 
         rcs_v

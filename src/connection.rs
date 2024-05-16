@@ -68,7 +68,7 @@ impl Connection {
     ///
     /// FIXME: any message above 512 bytes will be dropped
     pub async fn send(&self, address: &str, data: Bytes) -> Result<(String, String, usize)> {
-        let addr = address.to_owned().parse::<SocketAddr>()?;
+        let addr = address.to_string().parse::<SocketAddr>()?;
 
         match self.get_conn() {
             Some(sock) => {

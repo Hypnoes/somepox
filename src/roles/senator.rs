@@ -59,7 +59,7 @@ impl Roles<Issue> for Senator {
 
         match old_proposal.body().issue_type() {
             IssueType::Proposal => {
-                if role == "president".to_owned() {
+                if role == "president".to_string() {
                     if old_proposal.body().id() > self.last_proposal_id {
                         Ok(Mail::new(
                             Senator::my_address(),
