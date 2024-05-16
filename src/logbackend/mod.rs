@@ -10,10 +10,3 @@ use bytes::Bytes;
 pub trait Writable {
     fn write(&self, id: u64, data: Bytes) -> Result<()>;
 }
-
-pub fn file_logbackend() -> FileLogBackend {
-    todo!()
-}
-pub fn heap_logbackend() -> HeapLogBackend {
-    todo!()
-}

@@ -1,6 +1,5 @@
 use crate::{
-    connection::Connection,
-    logbackend::Writable,
+    connection::{Connection, Net},
     mail::{Mail, MailBox},
 };
 use anyhow::Result;
@@ -20,24 +19,32 @@ pub use crate::roles::proposer::Proposer;
 pub use crate::roles::secretary::Secretary;
 pub use crate::roles::senator::Senator;
 
+/*
+ 通信录：ID -> 地址列表
+*/
 type AddressBook = HashMap<String, Vec<String>>;
 
-trait Roles<Proposal>
+// actor 之间应该怎么通信：
+// 1. 线程：通过变量通信
+// 2. 进程：通过IPC通信
+// 3. 网络：通过Socket通信
+pub trait Actor<ActorMessage>
 where
-    Proposal: Clone + TryFrom<Bytes> + Into<Bytes> + Send + Sync,
+    ActorMessage: Clone + TryFrom<Bytes> + Into<Bytes> + Send + Sync,
 {
+    fn address(&self) -> &String;
     fn address_book(&self) -> &AddressBook;
-    fn msg_pipe(&self) -> &Connection;
-    fn send_box(&self) -> &MailBox<Proposal>;
-    fn recv_box(&self) -> &MailBox<Proposal>;
+    fn msg_pipe(&self) -> &Net;
+    fn send_box(&self) -> &MailBox<ActorMessage>;
+    fn recv_box(&self) -> &MailBox<ActorMessage>;
 
-    fn draft_new(&self, old_proposal: Mail<Proposal>) -> Result<Mail<Proposal>>;
+    fn process(&self, old_message: Mail<ActorMessage>) -> Result<Mail<ActorMessage>>;
 
     /**
      *  典型的角色工作流程：
 
         1. 接收阶段：
-        接受消息 ➡️ 反序列化消息至 Proposal ➡️ 将消息投入至收件箱
+        接受消息 ➡️ 反序列化消息至 ActorMessage ➡️ 将消息投入至收件箱
 
         2. 处理阶段：
         从邮箱取出消息 ➡️ 处理消息，进行表决 ➡️ 将表决结果投入至发件箱
@@ -45,12 +52,12 @@ where
         3. 发送阶段：
         从发件箱取出消息 ➡️ 发送消息
     */
-    async fn do_work(&self) -> Result<()> {
+    fn invoke(&self) -> Result<()> {
         // 第一步：
         //    1. ☑️ 接受消息
         //    2. ☑️ 反序列化消息至 Proposal
         //    3. ☑️ 将消息投入至收件箱
-        let new_msg = self.msg_pipe().recv().await?;
+        let new_msg = self.msg_pipe().recv()?;
         self.recv_box().put_mail(new_msg.try_into()?)?;
 
         // 第二步：
@@ -58,7 +65,7 @@ where
         //    2. ☑️ 处理消息，进行表决
         //    3. ☑️ 将表决结果投入至发件箱
         let old_mail = self.recv_box().get_mail()?;
-        let new_mail = self.draft_new(old_mail)?;
+        let new_mail = self.process(old_mail)?;
         self.send_box().put_mail(new_mail)?;
 
         // 第三步：
@@ -67,15 +74,21 @@ where
         let mail = self.send_box().get_mail()?;
 
         for recivers in mail.receivers().iter() {
-            self.msg_pipe().send(recivers, mail.body().into()).await?;
+            self.msg_pipe()
+                .send(recivers.to_string(), mail.body().into())?;
         }
 
         Ok(())
     }
+}
 
-    /**
-     * 帮助函数：通过地址确定发件人身份
-     */
+trait Roles<Proposal>: Actor<Proposal>
+where
+    Proposal: Clone + TryFrom<Bytes> + Into<Bytes> + Send + Sync,
+{
+    /*
+      帮助函数：通过地址确定发件人身份
+    */
     fn roles(&self, address: String) -> Option<String> {
         for (role_id, role_address) in self.address_book().iter() {
             if role_address.contains(&address) {
@@ -85,32 +98,3 @@ where
         None
     }
 }
-
-pub fn new_president(addr_book: AddressBook, endpoint: &str) -> Result<President> {
-    let host_and_port = endpoint.try_into()?;
-    Ok(President::new(addr_book, host_and_port))
-}
-
-pub fn new_proposer(addr_book: AddressBook, endpoint: &str) -> Result<Proposer> {
-    let host_and_port = endpoint.try_into()?;
-    Ok(Proposer::new(addr_book, host_and_port))
-}
-
-pub fn new_secretary<LogBackend: Writable>(
-    addr_book: AddressBook,
-    endpoint: &str,
-    log_backend: LogBackend,
-) -> Result<Secretary<LogBackend>> {
-    let host_and_port = endpoint.try_into()?;
-    Ok(Secretary::new(addr_book, host_and_port, log_backend))
-}
-
-pub fn new_senator(addr_book: AddressBook, endpoint: &str) -> Result<Senator> {
-    let host_and_port = endpoint.try_into()?;
-    Ok(Senator::new(addr_book, host_and_port))
-}
-
-pub const PRESIDENT_ROLE_NAME: &str = "President";
-pub const PROPOSER_ROLE_NAME: &str = "Proposer";
-pub const SECRETARY_ROLE_NAME: &str = "Secretary";
-pub const SENATOR_ROLE_NAME: &str = "Senator";

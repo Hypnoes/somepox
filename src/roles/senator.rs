@@ -1,46 +1,50 @@
-use super::{AddressBook, Roles, SENATOR_ROLE_NAME};
+use std::collections::HashMap;
+
+use super::{Actor, AddressBook, Roles};
 use crate::{
-    connection::{Connection, HostAndPort},
+    connection::Net,
     issue::{Issue, IssueType},
     mail::{Mail, MailBox},
 };
 use anyhow::{anyhow, Result};
-use std::collections::HashMap;
 
 /// 议员：
 /// 1. 对 *议长(President)* 下发的 *议题(Proposal)* 进行投票
 /// 2. 如果当前议题的 *编号(id)* 大于已处理的 *编号(id)* ，同意该提案；否则拒绝
 /// 3. 回复投票结果至 *议长(President)*
 pub struct Senator {
+    address: String,
     address_book: AddressBook,
     send_box: MailBox<Issue>,
     recv_box: MailBox<Issue>,
-    connection: Connection,
+    connection: Net,
     last_proposal_id: u32,
 }
 
 impl Senator {
-    pub fn new(address_book: AddressBook, endpoint: HostAndPort) -> Self {
-        Self {
-            address_book,
+    pub fn new(address: String) -> Result<Self> {
+        let conn = Net::new(address.as_str())?;
+        Ok(Self {
+            address: address,
+            address_book: HashMap::new(),
             send_box: MailBox::new(),
             recv_box: MailBox::new(),
-            connection: Connection::new(endpoint),
+            connection: conn,
             last_proposal_id: 0,
-        }
-    }
-
-    fn my_address() -> String {
-        SENATOR_ROLE_NAME.to_string()
+        })
     }
 }
 
-impl Roles<Issue> for Senator {
+impl Actor<Issue> for Senator {
+    fn address(&self) -> &String {
+        &(self.address)
+    }
+
     fn address_book(&self) -> &AddressBook {
         &(self.address_book)
     }
 
-    fn msg_pipe(&self) -> &Connection {
+    fn msg_pipe(&self) -> &Net {
         &(self.connection)
     }
 
@@ -52,7 +56,7 @@ impl Roles<Issue> for Senator {
         &(self.recv_box)
     }
 
-    fn draft_new(&self, old_proposal: Mail<Issue>) -> Result<Mail<Issue>> {
+    fn process(&self, old_proposal: Mail<Issue>) -> Result<Mail<Issue>> {
         let role = self
             .roles(old_proposal.sender())
             .unwrap_or("error".to_string());
@@ -62,7 +66,7 @@ impl Roles<Issue> for Senator {
                 if role == "president".to_string() {
                     if old_proposal.body().id() > self.last_proposal_id {
                         Ok(Mail::new(
-                            Senator::my_address(),
+                            self.address.clone(),
                             self.address_book()
                                 .get("president")
                                 .map(|addr| addr.join(","))
@@ -89,3 +93,5 @@ impl Roles<Issue> for Senator {
         }
     }
 }
+
+impl Roles<Issue> for Senator {}

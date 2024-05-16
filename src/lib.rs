@@ -1,8 +1,8 @@
-pub mod connection;
-pub mod issue;
-pub mod logbackend;
-pub mod mail;
-pub mod roles;
+mod connection;
+mod issue;
+mod logbackend;
+mod mail;
+mod roles;
 
 pub const HALF_OF_VOTERS: u8 = 1;
 
@@ -11,31 +11,19 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::{
-        logbackend::file_logbackend,
-        roles::{
-            new_president, new_proposer, new_secretary, new_senator, PRESIDENT_ROLE_NAME,
-            PROPOSER_ROLE_NAME, SECRETARY_ROLE_NAME, SENATOR_ROLE_NAME,
-        },
+        logbackend::HeapLogBackend,
+        roles::{President, Proposer, Secretary, Senator},
     };
 
     #[test]
     fn test_1() {
         let mut addr_book = HashMap::new();
 
+        addr_book.insert("president".to_string(), vec!["localhost:5001".to_string()]);
+        addr_book.insert("proposer".to_string(), vec!["localhost:5002".to_string()]);
+        addr_book.insert("secretary".to_string(), vec!["localhost:5003".to_string()]);
         addr_book.insert(
-            PRESIDENT_ROLE_NAME.to_string(),
-            vec!["localhost:5001".to_string()],
-        );
-        addr_book.insert(
-            PROPOSER_ROLE_NAME.to_string(),
-            vec!["localhost:5002".to_string()],
-        );
-        addr_book.insert(
-            SECRETARY_ROLE_NAME.to_string(),
-            vec!["localhost:5003".to_string()],
-        );
-        addr_book.insert(
-            SENATOR_ROLE_NAME.to_string(),
+            "senator".to_string(),
             vec![
                 "localhost:5005".to_string(),
                 "localhost:5006".to_string(),
@@ -43,15 +31,17 @@ mod tests {
             ],
         );
 
-        let log_backend = file_logbackend();
+        let log_backend = HeapLogBackend::new();
 
-        let president = new_president(addr_book.clone(), "localhost:5001").unwrap();
-        let proposer = new_proposer(addr_book.clone(), "localhost:5002").unwrap();
-        let secretary = new_secretary(addr_book.clone(), "localhost:5003", log_backend).unwrap();
-        let senator1 = new_senator(addr_book.clone(), "localhost:5005").unwrap();
-        let senator2 = new_senator(addr_book.clone(), "localhost:5006").unwrap();
-        let senator3 = new_senator(addr_book.clone(), "localhost:5007").unwrap();
+        let president = President::new("localhost:5001".to_string()).unwrap();
+        let proposer = Proposer::new("localhost:5002".to_string()).unwrap();
+        let secretary = Secretary::new("localhost:5003".to_string(), log_backend).unwrap();
+        let senator1 = Senator::new("localhost:5004".to_string()).unwrap();
+        let senator2 = Senator::new("localhost:5005".to_string()).unwrap();
+        let senator3 = Senator::new("localhost:5006".to_string()).unwrap();
 
-        assert!(true, "test");
+        let mut result = proposer.emmit("test-msg:A");
+
+        assert!(result.is_ok());
     }
 }

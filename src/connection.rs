@@ -1,119 +1,119 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use bytes::{Bytes, BytesMut};
-use std::{net::SocketAddr, sync::Arc};
-use tokio::net::UdpSocket;
+use std::{
+    net::{ToSocketAddrs, UdpSocket},
+    sync::Arc,
+};
 
-pub struct HostAndPort(pub String, pub u16);
+pub trait Connection {
+    type Addr;
+    fn send(&self, address: Self::Addr, data: Bytes) -> Result<(Self::Addr, Self::Addr, usize)>;
+    fn recv(&self) -> Result<(Self::Addr, Self::Addr, Bytes)>;
+}
 
-impl TryFrom<String> for HostAndPort {
-    type Error = anyhow::Error;
+pub struct Net(Arc<UdpSocket>);
 
-    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
-        Self::try_from(value.as_str())
+impl Net {
+    pub fn new(endpoint: impl ToSocketAddrs) -> Result<Net> {
+        Ok(Net(Arc::new(UdpSocket::bind(endpoint)?)))
+    }
+
+    fn get_conn(&self) -> *const UdpSocket {
+        Arc::downgrade(&self.0).into_raw()
     }
 }
 
-impl TryFrom<&str> for HostAndPort {
-    type Error = anyhow::Error;
-
-    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
-        let parts: Vec<&str> = value.split(':').collect();
-
-        if parts.len() != 2 {
-            return Err(anyhow!("invalid host:port"));
-        } else {
-            let host = parts[0].to_string();
-            if host.is_empty() {
-                return Err(anyhow!("host is empty"));
-            }
-
-            let port = parts[1].parse::<u16>()?;
-            if port < 5000 {
-                return Err(anyhow!("port is beyond 5000"));
-            }
-
-            Ok(Self(host, port))
-        }
-    }
-}
-
-pub struct Connection {
-    host: String,
-    port: u16,
-    connection: Option<Arc<UdpSocket>>,
-}
-
-impl Connection {
-    pub fn new(endpoint: HostAndPort) -> Connection {
-        Connection {
-            host: endpoint.0,
-            port: endpoint.1,
-            connection: None,
-        }
-    }
-
-    pub async fn init(&mut self) -> Result<()> {
-        let addr = format!("{}:{}", self.host, self.port);
-        let raw_bind = UdpSocket::bind(addr).await?;
-        self.connection = Some(Arc::new(raw_bind));
-        Ok(())
-    }
-
-    pub fn close(&mut self) -> Result<()> {
-        self.connection = None;
-        Ok(())
-    }
-
+impl Connection for Net {
     /// send a message
     ///
     /// FIXME: any message above 512 bytes will be dropped
-    pub async fn send(&self, address: &str, data: Bytes) -> Result<(String, String, usize)> {
-        let addr = address.to_string().parse::<SocketAddr>()?;
+    fn send(&self, address: Self::Addr, data: Bytes) -> Result<(Self::Addr, Self::Addr, usize)> {
+        let buffer: &[u8] = &data;
 
-        match self.get_conn() {
-            Some(sock) => {
-                let buffer: &[u8] = &data;
-                let record_size = sock.try_send_to(buffer, addr)?;
-
-                let local_address = sock.local_addr()?.to_string();
-                let remote_address = sock.peer_addr()?.to_string();
-
-                Ok((local_address, remote_address, record_size))
-            }
-            None => {
-                log::error!("no connection available.");
-                Err(anyhow!("No Connection available."))
-            }
+        unsafe {
+            let sock = &*(self.get_conn());
+            let record_size = sock.send_to(buffer, address)?;
+            let local_address = sock.local_addr()?.to_string();
+            let remote_address = sock.peer_addr()?.to_string();
+            Ok((local_address, remote_address, record_size))
         }
     }
 
     /// recv message
     ///
     /// FIXME: any message above 512 bytes will be dropped
-    pub async fn recv(&self) -> Result<(String, String, Bytes)> {
+    fn recv(&self) -> Result<(Self::Addr, Self::Addr, Bytes)> {
         let mut msg = BytesMut::new();
-        let maybe_sock = self.get_conn();
+        let buffer: &mut [u8; 512] = &mut [0; 512];
 
-        match maybe_sock {
-            Some(sock) => {
-                let buffer: &mut [u8; 512] = &mut [0; 512];
+        unsafe {
+            let sock = &*(self.get_conn());
+            let (record_size, addr) = sock.recv_from(buffer)?;
+            msg.extend(&buffer[..record_size]);
 
-                let (record_size, _) = sock.try_recv_from(buffer)?;
-
-                msg.extend(&buffer[..record_size]);
-
-                let local_address = sock.local_addr()?.to_string();
-                let remote_address = sock.peer_addr()?.to_string();
-                Ok((remote_address, local_address, msg.into()))
-            }
-            None => {
-                log::error!("no connection available.");
-                Err(anyhow!("No Connection available."))
-            }
+            let local_address = sock.local_addr()?.to_string();
+            let remote_address = sock.peer_addr()?.to_string();
+            Ok((remote_address, local_address, msg.into()))
         }
     }
 
-    fn get_conn(&self) -> Option<Arc<UdpSocket>> {
-        (self.connection.as_ref()).map(|socket_rc| socket_rc.clone())
+    type Addr = String;
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::net::UdpSocket;
+
+    use super::{Connection, Net};
+    use anyhow::Result;
+
+    #[test]
+    fn test_1() {
+        let test_message_1 = "test_message_1".to_string();
+        let test_message_2 = "test_message_2".to_string();
+
+        let test_addr_1 = "127.0.0.1:18001";
+        let test_addr_2 = "127.0.0.1:18002";
+
+        let test_conn_1 = Net::new(test_addr_1).unwrap();
+        let test_conn_2 = Net::new(test_addr_2).unwrap();
+
+        let mut send_result: Result<(String, String, usize)>;
+        let mut recv_result: Result<()>;
+
+        send_result = test_conn_1.send(test_addr_2.to_string(), test_message_1.clone().into());
+        assert!(send_result.is_ok(), "Err = {}", send_result.unwrap_err());
+
+        recv_result = test_conn_2.recv().and_then(|(_, _, v)| {
+            let result = String::from_utf8(v.to_vec()).unwrap();
+            assert!(test_message_1 == result);
+            println!("conn 1 => conn 2 | OK.");
+            Ok(())
+        });
+        assert!(recv_result.is_ok(), "Err = {}", recv_result.unwrap_err());
+
+        send_result = test_conn_2.send(test_addr_1.to_string(), test_message_2.clone().into());
+        assert!(send_result.is_ok(), "Err = {}", send_result.unwrap_err());
+
+        recv_result = test_conn_1.recv().and_then(|(_, _, v)| {
+            let result = String::from_utf8(v.to_vec()).unwrap();
+            assert!(test_message_2 == result);
+            println!("conn 2 => conn 1 | OK.");
+            Ok(())
+        });
+        assert!(recv_result.is_ok(), "Err = {}", recv_result.unwrap_err());
+    }
+
+    #[test]
+    fn test_2() {
+        let socket = UdpSocket::bind("127.0.0.1:34254").unwrap();
+
+        let mut buf = [0; 10];
+        let (amt, src) = socket.recv_from(&mut buf).unwrap();
+
+        let buf = &mut buf[..amt];
+        buf.reverse();
+        socket.send_to(buf, &src).unwrap();
     }
 }
