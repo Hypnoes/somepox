@@ -37,7 +37,7 @@ impl Writable for FileLogBackend {
 
 #[cfg(test)]
 mod tests {
-    use super::FileLogBackend;
+    use crate::logbackend::FileLogBackend;
     use crate::logbackend::Writable;
     use anyhow::Result;
     use std::{fmt::Display, fs, path::Path};

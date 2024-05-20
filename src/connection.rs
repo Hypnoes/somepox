@@ -104,16 +104,4 @@ mod tests {
         });
         assert!(recv_result.is_ok(), "Err = {}", recv_result.unwrap_err());
     }
-
-    #[test]
-    fn test_2() {
-        let socket = UdpSocket::bind("127.0.0.1:34254").unwrap();
-
-        let mut buf = [0; 10];
-        let (amt, src) = socket.recv_from(&mut buf).unwrap();
-
-        let buf = &mut buf[..amt];
-        buf.reverse();
-        socket.send_to(buf, &src).unwrap();
-    }
 }

@@ -8,7 +8,7 @@ pub const HALF_OF_VOTERS: u8 = 1;
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, net::UdpSocket};
 
     use crate::{
         logbackend::HeapLogBackend,
@@ -43,5 +43,23 @@ mod tests {
         let mut result = proposer.emmit("test-msg:A");
 
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_2() -> std::io::Result<()> {
+        {
+            let socket = UdpSocket::bind("127.0.0.1:34254")?;
+
+            // Receives a single datagram message on the socket. If `buf` is too small to hold
+            // the message, it will be cut off.
+            let mut buf = [0; 10];
+            let (amt, src) = socket.recv_from(&mut buf)?;
+
+            // Redeclare `buf` as slice of the received data and send reverse data back to origin.
+            let buf = &mut buf[..amt];
+            buf.reverse();
+            socket.send_to(buf, &src)?;
+        } // the socket is closed here
+        Ok(())
     }
 }
