@@ -21,7 +21,7 @@ pub struct Proposer {
 
 impl Proposer {
     pub fn new(address: String) -> Result<Self> {
-        let conn = Net::new(address.as_str())?;
+        let conn = Net::new(address.clone())?;
         Ok(Self {
             address: address,
             address_book: HashMap::new(),

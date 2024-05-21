@@ -25,7 +25,7 @@ where
 
 impl<LogBackend: Writable> Secretary<LogBackend> {
     pub fn new(address: String, log_backend: LogBackend) -> Result<Self> {
-        let conn = Net::new(address.as_str())?;
+        let conn = Net::new(address.clone())?;
         Ok(Self {
             address: address,
             address_book: HashMap::new(),

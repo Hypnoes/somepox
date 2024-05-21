@@ -1,25 +1,83 @@
 use anyhow::Result;
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use std::{
-    net::{ToSocketAddrs, UdpSocket},
-    sync::Arc,
+    net::UdpSocket,
+    sync::{
+        mpsc::{channel, Receiver},
+        Arc, RwLock,
+    },
+    thread::{self, JoinHandle},
 };
 
 pub trait Connection {
     type Addr;
     fn send(&self, address: Self::Addr, data: Bytes) -> Result<(Self::Addr, Self::Addr, usize)>;
-    fn recv(&self) -> Result<(Self::Addr, Self::Addr, Bytes)>;
+    fn recv(&self) -> Result<(String, String, Bytes)>;
 }
 
-pub struct Net(Arc<UdpSocket>);
+pub struct Net {
+    serv: Option<JoinHandle<()>>,
+    serv_flag: Arc<RwLock<bool>>,
+    local_addr: String,
+    rx: Receiver<(String, Bytes)>,
+    sock: Arc<UdpSocket>,
+}
 
 impl Net {
-    pub fn new(endpoint: impl ToSocketAddrs) -> Result<Net> {
-        Ok(Net(Arc::new(UdpSocket::bind(endpoint)?)))
+    pub fn new(endpoint: String) -> Result<Net> {
+        let sc = Arc::new(UdpSocket::bind(endpoint.clone())?);
+
+        let (tx, rx) = channel();
+        let serv_flag = Arc::new(RwLock::new(true));
+        let serv_flag_ref = serv_flag.clone();
+
+        let sc_ref = sc.clone();
+        let serv_handler = thread::Builder::new()
+            .name("socket listener thread".to_string())
+            .spawn(move || {
+                let mut buffer = [0u8; 512];
+
+                loop {
+                    if let Ok(flag_ref) = serv_flag_ref.read() {
+                        if !(flag_ref.clone()) {
+                            break;
+                        }
+                        log::info!("Serv Shutdown.");
+                    }
+                    if let Ok((amt, src)) = sc_ref.clone().recv_from(&mut buffer) {
+                        if let Ok(_) =
+                            tx.send((src.to_string(), Bytes::copy_from_slice(&buffer[..amt])))
+                        {
+                        }
+                    }
+                }
+            })?;
+
+        Ok(Net {
+            serv: Some(serv_handler),
+            serv_flag: serv_flag.clone(),
+            local_addr: endpoint,
+            rx,
+            sock: sc,
+        })
     }
 
-    fn get_conn(&self) -> *const UdpSocket {
-        Arc::downgrade(&self.0).into_raw()
+    fn serv_state(&self) -> bool {
+        match self.serv_flag.clone().read() {
+            Ok(v) => v.clone(),
+            Err(_) => false,
+        }
+    }
+
+    /// Shutdown The Serv
+    ///
+    /// FIXME: shutdown 有问题，join 会 block 在 recv_from 函数。使得循环永远不会执行至下一圈，所以无法到达判断 flag 处。
+    pub fn shutdown(&mut self) -> Result<()> {
+        let _ = self.serv_flag.write().map(|mut v| v.clone_from(&false));
+        let _ = self.serv.take().map(|v| {
+            let _ = v.join();
+        });
+        Ok(())
     }
 }
 
@@ -30,31 +88,19 @@ impl Connection for Net {
     fn send(&self, address: Self::Addr, data: Bytes) -> Result<(Self::Addr, Self::Addr, usize)> {
         let buffer: &[u8] = &data;
 
-        unsafe {
-            let sock = &*(self.get_conn());
-            let record_size = sock.send_to(buffer, address)?;
-            let local_address = sock.local_addr()?.to_string();
-            let remote_address = sock.peer_addr()?.to_string();
-            Ok((local_address, remote_address, record_size))
-        }
+        let sock = self.sock.clone();
+        sock.connect(address.clone())?;
+        let record_size = sock.send(buffer)?;
+        let local_address = sock.local_addr()?.to_string();
+        let remote_address = sock.peer_addr()?.to_string();
+        Ok((local_address, remote_address, record_size))
     }
 
     /// recv message
-    ///
-    /// FIXME: any message above 512 bytes will be dropped
-    fn recv(&self) -> Result<(Self::Addr, Self::Addr, Bytes)> {
-        let mut msg = BytesMut::new();
-        let buffer: &mut [u8; 512] = &mut [0; 512];
-
-        unsafe {
-            let sock = &*(self.get_conn());
-            let (record_size, addr) = sock.recv_from(buffer)?;
-            msg.extend(&buffer[..record_size]);
-
-            let local_address = sock.local_addr()?.to_string();
-            let remote_address = sock.peer_addr()?.to_string();
-            Ok((remote_address, local_address, msg.into()))
-        }
+    fn recv(&self) -> Result<(String, String, Bytes)> {
+        let (remote_addr, data) = self.rx.recv()?;
+        let local_addr = self.local_addr.clone();
+        Ok((local_addr, remote_addr, data))
     }
 
     type Addr = String;
@@ -62,8 +108,6 @@ impl Connection for Net {
 
 #[cfg(test)]
 mod tests {
-
-    use std::net::UdpSocket;
 
     use super::{Connection, Net};
     use anyhow::Result;
@@ -76,8 +120,8 @@ mod tests {
         let test_addr_1 = "127.0.0.1:18001";
         let test_addr_2 = "127.0.0.1:18002";
 
-        let test_conn_1 = Net::new(test_addr_1).unwrap();
-        let test_conn_2 = Net::new(test_addr_2).unwrap();
+        let test_conn_1 = Net::new(test_addr_1.to_string()).unwrap();
+        let test_conn_2 = Net::new(test_addr_2.to_string()).unwrap();
 
         let mut send_result: Result<(String, String, usize)>;
         let mut recv_result: Result<()>;
