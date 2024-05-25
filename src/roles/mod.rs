@@ -19,26 +19,29 @@ pub use crate::roles::proposer::Proposer;
 pub use crate::roles::secretary::Secretary;
 pub use crate::roles::senator::Senator;
 
+type ID = String;
+type Address = String;
 /*
  通信录：ID -> 地址列表
 */
-type AddressBook = HashMap<String, Vec<String>>;
+type AddressBook = HashMap<ID, Vec<Address>>;
 
 // actor 之间应该怎么通信：
 // 1. 线程：通过变量通信
 // 2. 进程：通过IPC通信
 // 3. 网络：通过Socket通信
-pub trait Actor<ActorMessage>
+pub trait Actor<M, C>
 where
-    ActorMessage: Clone + TryFrom<Bytes> + Into<Bytes> + Send + Sync,
+    M: Clone + TryFrom<Bytes> + Into<Bytes> + Send + Sync,
+    C: Connection<Addr = String>,
 {
-    fn address(&self) -> &String;
+    fn address(&self) -> &Address;
     fn address_book(&self) -> &AddressBook;
-    fn msg_pipe(&self) -> &Net;
-    fn send_box(&self) -> &MailBox<ActorMessage>;
-    fn recv_box(&self) -> &MailBox<ActorMessage>;
+    fn msg_pipe(&self) -> &C;
+    fn send_box(&self) -> &MailBox<M>;
+    fn recv_box(&self) -> &MailBox<M>;
 
-    fn process(&self, old_message: Mail<ActorMessage>) -> Result<Mail<ActorMessage>>;
+    fn process(&self, old_message: Mail<M>) -> Result<Mail<M>>;
 
     /**
      *  典型的角色工作流程：
@@ -82,9 +85,10 @@ where
     }
 }
 
-trait Roles<Proposal>: Actor<Proposal>
+trait Roles<Proposal, Conn>: Actor<Proposal, Conn>
 where
     Proposal: Clone + TryFrom<Bytes> + Into<Bytes> + Send + Sync,
+    Conn: Connection<Addr = String>,
 {
     /*
       帮助函数：通过地址确定发件人身份

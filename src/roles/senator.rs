@@ -35,7 +35,7 @@ impl Senator {
     }
 }
 
-impl Actor<Issue> for Senator {
+impl Actor<Issue, Net> for Senator {
     fn address(&self) -> &String {
         &(self.address)
     }
@@ -94,4 +94,4 @@ impl Actor<Issue> for Senator {
     }
 }
 
-impl Roles<Issue> for Senator {}
+impl Roles<Issue, Net> for Senator {}

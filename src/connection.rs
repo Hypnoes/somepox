@@ -9,6 +9,16 @@ use std::{
     thread::{self, JoinHandle},
 };
 
+/**
+   ### Connection 抽象描述通信过程 ###
+
+   Connection 主要通过两个方式实现通信 Send (发送) / Receive (接受)
+
+   典型的实现包括三个:
+   1. 线程：通过变量通信
+   2. 进程：通过IPC通信
+   3. 网络：通过Socket通信
+*/
 pub trait Connection {
     type Addr;
     fn send(&self, address: Self::Addr, data: Bytes) -> Result<(Self::Addr, Self::Addr, usize)>;
@@ -19,7 +29,7 @@ pub struct Net {
     serv: Option<JoinHandle<()>>,
     serv_flag: Arc<RwLock<bool>>,
     local_addr: String,
-    rx: Receiver<(String, Bytes)>,
+    channel: Receiver<(String, Bytes)>,
     sock: Arc<UdpSocket>,
 }
 
@@ -57,7 +67,7 @@ impl Net {
             serv: Some(serv_handler),
             serv_flag: serv_flag.clone(),
             local_addr: endpoint,
-            rx,
+            channel: rx,
             sock: sc,
         })
     }
@@ -98,7 +108,7 @@ impl Connection for Net {
 
     /// recv message
     fn recv(&self) -> Result<(String, String, Bytes)> {
-        let (remote_addr, data) = self.rx.recv()?;
+        let (remote_addr, data) = self.channel.recv()?;
         let local_addr = self.local_addr.clone();
         Ok((local_addr, remote_addr, data))
     }
