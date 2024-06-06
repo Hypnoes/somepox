@@ -4,7 +4,7 @@ use super::AddressBook;
 use crate::{
     connection::Net,
     issue::{Issue, IssueType},
-    logbackend::Writable,
+    logbackend::{Queryable, Writable},
     mail::{Mail, MailBox},
 };
 use anyhow::{anyhow, Result};
@@ -13,7 +13,7 @@ use anyhow::{anyhow, Result};
 /// 将议题 *决定(Resolution)* 写入记录中
 pub struct Secretary<LogBackend>
 where
-    LogBackend: Writable,
+    LogBackend: Writable + Queryable,
 {
     address: String,
     address_book: AddressBook,
@@ -23,12 +23,16 @@ where
     log_backend: LogBackend,
 }
 
-impl<LogBackend: Writable> Secretary<LogBackend> {
-    pub fn new(address: String, log_backend: LogBackend) -> Result<Self> {
+impl<LogBackend: Writable + Queryable> Secretary<LogBackend> {
+    pub fn new(
+        address: String,
+        address_book: AddressBook,
+        log_backend: LogBackend,
+    ) -> Result<Self> {
         let conn = Net::new(address.clone())?;
         Ok(Self {
             address: address,
-            address_book: HashMap::new(),
+            address_book: address_book,
             send_box: MailBox::new(),
             recv_box: MailBox::new(),
             connection: conn,
@@ -64,6 +68,11 @@ impl<LogBackend: Writable> Secretary<LogBackend> {
                 }
             }
         }
+    }
+
+    pub fn get_log(&self, id: u64) -> Result<String> {
+        let query_result = self.log_backend.query(id)?;
+        Ok(String::from_utf8(query_result.into())?)
     }
 
     fn roles(&self, address: String) -> Option<String> {

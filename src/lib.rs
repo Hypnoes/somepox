@@ -36,15 +36,17 @@ mod tests {
 
         let log_backend = HeapLogBackend::new();
 
-        let president = President::new("localhost:5001".to_string()).unwrap();
-        let proposer = Proposer::new("localhost:5002".to_string()).unwrap();
-        let secretary = Secretary::new("localhost:5003".to_string(), log_backend).unwrap();
-        let senator1 = Senator::new("localhost:5004".to_string()).unwrap();
-        let senator2 = Senator::new("localhost:5005".to_string()).unwrap();
-        let senator3 = Senator::new("localhost:5006".to_string()).unwrap();
+        let president = President::new("localhost:5001".to_string(), addr_book.clone()).unwrap();
+        let proposer = Proposer::new("localhost:5002".to_string(), addr_book.clone()).unwrap();
+        let secretary =
+            Secretary::new("localhost:5003".to_string(), addr_book.clone(), log_backend).unwrap();
+        let senator1 = Senator::new("localhost:5004".to_string(), addr_book.clone()).unwrap();
+        let senator2 = Senator::new("localhost:5005".to_string(), addr_book.clone()).unwrap();
+        let senator3 = Senator::new("localhost:5006".to_string(), addr_book.clone()).unwrap();
 
-        let mut result = proposer.emmit("test-msg:A");
+        let proposer_emmit_issue = proposer.emmit("test-msg:A");
+        assert!(proposer_emmit_issue.is_ok());
 
-        assert!(result.is_ok());
+        println!("{:?}", secretary.get_log(0));
     }
 }

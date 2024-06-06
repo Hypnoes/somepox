@@ -23,11 +23,11 @@ pub struct President {
 }
 
 impl President {
-    pub fn new(address: String) -> Result<Self> {
+    pub fn new(address: String, address_book: AddressBook) -> Result<Self> {
         let conn = Net::new(address.clone())?;
         Ok(Self {
             address: address,
-            address_book: HashMap::new(),
+            address_book: address_book,
             send_box: MailBox::new(),
             recv_box: MailBox::new(),
             connection: conn,

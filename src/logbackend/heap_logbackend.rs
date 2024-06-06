@@ -19,12 +19,14 @@
 //!
 
 use crate::logbackend::Writable;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, LinkedList},
 };
+
+use super::Queryable;
 
 pub struct HeapLogBackend {
     table: RefCell<BTreeMap<u64, RefCell<LinkedList<Bytes>>>>,
@@ -48,6 +50,20 @@ impl Writable for HeapLogBackend {
                 table_ref.insert(id, RefCell::new(LinkedList::from([data.clone()])));
                 Ok(())
             }
+        }
+    }
+}
+
+impl Queryable for HeapLogBackend {
+    fn query(&self, id: u64) -> Result<Bytes> {
+        let table_ref = self.table.try_borrow()?;
+
+        match table_ref.get(&id) {
+            Some(version_his_ref) => version_his_ref
+                .borrow()
+                .back()
+                .map_or(Err(anyhow!("Item Not Found.")), |v| Ok(v.clone())),
+            None => Err(anyhow!("Item Not Found.")),
         }
     }
 }

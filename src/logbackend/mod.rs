@@ -10,3 +10,7 @@ use bytes::Bytes;
 pub trait Writable {
     fn write(&self, id: u64, data: Bytes) -> Result<()>;
 }
+
+pub trait Queryable {
+    fn query(&self, id: u64) -> Result<Bytes>;
+}
