@@ -1,10 +1,12 @@
+#![allow(unused)]
+
 use anyhow::Result;
 use bytes::Bytes;
 use std::{
     net::UdpSocket,
     sync::{
         mpsc::{channel, Receiver},
-        Arc, RwLock,
+        Arc,
     },
     thread::{self, JoinHandle},
 };
@@ -20,74 +22,49 @@ use std::{
    3. 网络：通过Socket通信
 */
 pub trait Connection {
-    type Addr;
+    type Addr: TryFrom<String> + Into<String>;
     fn send(&self, address: Self::Addr, data: Bytes) -> Result<(Self::Addr, Self::Addr, usize)>;
-    fn recv(&self) -> Result<(String, String, Bytes)>;
+    fn recv(&self) -> Result<(Self::Addr, Self::Addr, Bytes)>;
 }
 
+pub struct Ipc {}
+pub struct Channel {}
+
 pub struct Net {
-    serv: Option<JoinHandle<()>>,
-    serv_flag: Arc<RwLock<bool>>,
-    local_addr: String,
-    channel: Receiver<(String, Bytes)>,
     sock: Arc<UdpSocket>,
+    handler: JoinHandle<()>,
+    channel: Receiver<(String, Bytes)>,
+    addr: String,
 }
 
 impl Net {
     pub fn new(endpoint: String) -> Result<Net> {
         let sc = Arc::new(UdpSocket::bind(endpoint.clone())?);
-
         let (tx, rx) = channel();
-        let serv_flag = Arc::new(RwLock::new(true));
-        let serv_flag_ref = serv_flag.clone();
 
         let sc_ref = sc.clone();
         let serv_handler = thread::Builder::new()
-            .name("socket listener thread".to_string())
+            .name("Socket listener thread".to_string())
             .spawn(move || {
                 let mut buffer = [0u8; 512];
 
                 loop {
-                    if let Ok(flag_ref) = serv_flag_ref.read() {
-                        if !(flag_ref.clone()) {
-                            break;
-                        }
-                        log::info!("Serv Shutdown.");
-                    }
-                    if let Ok((amt, src)) = sc_ref.clone().recv_from(&mut buffer) {
-                        if let Ok(_) =
-                            tx.send((src.to_string(), Bytes::copy_from_slice(&buffer[..amt])))
-                        {
-                        }
-                    }
+                    sc_ref
+                        .clone()
+                        .recv_from(&mut buffer)
+                        .iter()
+                        .flat_map(|(amt, src)| {
+                            tx.send((src.to_string(), Bytes::copy_from_slice(&buffer[..(*amt)])))
+                        });
                 }
             })?;
 
         Ok(Net {
-            serv: Some(serv_handler),
-            serv_flag: serv_flag.clone(),
-            local_addr: endpoint,
-            channel: rx,
             sock: sc,
+            handler: serv_handler,
+            channel: rx,
+            addr: endpoint,
         })
-    }
-
-    fn serv_state(&self) -> bool {
-        match self.serv_flag.clone().read() {
-            Ok(v) => v.clone(),
-            Err(_) => false,
-        }
-    }
-
-    /// Shutdown The Serv
-    ///
-    /// FIXME: shutdown 有问题，join 会 block 在 recv_from 函数。使得循环永远不会执行至下一圈，所以无法到达判断 flag 处。
-    pub fn shutdown(&mut self) -> Result<()> {
-        let _ = self.serv_flag.write().map(|mut v| v.clone_from(&false));
-        let _ = self.serv.take().map(|v| {
-            let _ = v.join();
-        });
-        Ok(())
     }
 }
 
@@ -107,9 +84,9 @@ impl Connection for Net {
     }
 
     /// recv message
-    fn recv(&self) -> Result<(String, String, Bytes)> {
+    fn recv(&self) -> Result<(Self::Addr, Self::Addr, Bytes)> {
         let (remote_addr, data) = self.channel.recv()?;
-        let local_addr = self.local_addr.clone();
+        let local_addr = self.addr.clone();
         Ok((local_addr, remote_addr, data))
     }
 

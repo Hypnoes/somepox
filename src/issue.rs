@@ -1,16 +1,16 @@
-use std::fmt::Display;
+#![allow(unused)]
 
 use bytes::Bytes;
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct Issue {
     content: String,
-    id: u32,
+    id: u64,
     issue_type: IssueType,
 }
 
 impl Issue {
-    pub fn new(content: String, id: u32, issue_type: IssueType) -> Self {
+    pub fn new(content: String, id: u64, issue_type: IssueType) -> Self {
         Issue {
             content,
             id,
@@ -22,7 +22,7 @@ impl Issue {
         self.content.clone()
     }
 
-    pub fn id(&self) -> u32 {
+    pub fn id(&self) -> u64 {
         self.id.clone()
     }
 
@@ -49,7 +49,7 @@ impl TryFrom<Bytes> for Issue {
             let parts: Vec<&str> = raw_issue_content.split("|").collect();
 
             let it = IssueType::try_from(parts[0])?;
-            let id = u32::from_str_radix(parts[1], 10)?;
+            let id = u64::from_str_radix(parts[1], 10)?;
             let ct = parts[2];
 
             Ok(Issue {
@@ -63,8 +63,7 @@ impl TryFrom<Bytes> for Issue {
 
 impl Into<Bytes> for Issue {
     fn into(self) -> Bytes {
-        // 我麻了，深拷贝三次。。。
-        let coded_issue_type = self.clone().issue_type.to_string();
+        let coded_issue_type = self.clone().issue_type.into();
         let coded_issue_id = self.clone().id.to_string();
         let coded_issue_content = self.clone().content;
 
@@ -75,21 +74,11 @@ impl Into<Bytes> for Issue {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub enum IssueType {
     Proposal,
     Vote,
     Resolution,
-}
-
-impl Display for IssueType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IssueType::Proposal => write!(f, "p"),
-            IssueType::Vote => write!(f, "v"),
-            IssueType::Resolution => write!(f, "r"),
-        }
-    }
 }
 
 impl Into<String> for IssueType {

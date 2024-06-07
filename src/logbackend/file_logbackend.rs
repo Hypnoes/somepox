@@ -1,7 +1,7 @@
 //! ### File Based Log Backend
 //! Use File to Store Log
 //!
-
+#![allow(unused)]
 use super::Writable;
 use anyhow::{anyhow, Result};
 use bytes::Bytes;

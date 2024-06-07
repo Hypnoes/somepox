@@ -17,8 +17,7 @@
 //! 4. linkedlist ➡️ last item indecated the last version of the log content
 //!
 //!
-
-use crate::logbackend::Writable;
+#![allow(unused)]
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use std::{
@@ -26,7 +25,7 @@ use std::{
     collections::{BTreeMap, LinkedList},
 };
 
-use super::Queryable;
+use super::{Queryable, Writable};
 
 pub struct HeapLogBackend {
     table: RefCell<BTreeMap<u64, RefCell<LinkedList<Bytes>>>>,

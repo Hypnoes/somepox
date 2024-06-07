@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 mod file_logbackend;
 mod heap_logbackend;
 
