@@ -105,10 +105,7 @@ mod tests {
     #[test]
     fn heap_logbackend_new_test() {
         let test_backend = HeapLogBackend::new();
-        assert!(
-            test_backend.table.borrow().len() == 0,
-            "test_backend table is not empty"
-        );
+        assert_eq!(test_backend.table.borrow().len(), 0, "test_backend table is not empty");
     }
 
     #[test]

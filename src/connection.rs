@@ -66,6 +66,8 @@ impl Net {
 }
 
 impl Connection for Net {
+    type Addr = String;
+
     /// send a message
     ///
     /// FIXME: any message above 512 bytes will be dropped
@@ -86,8 +88,6 @@ impl Connection for Net {
         let local_addr = self.addr.clone();
         Ok((local_addr, remote_addr, data))
     }
-
-    type Addr = String;
 }
 
 #[cfg(test)]
@@ -115,7 +115,7 @@ mod tests {
 
         recv_result = test_conn_2.recv().and_then(|(_, _, v)| {
             let result = String::from_utf8(v.to_vec()).unwrap();
-            assert!(test_message_1 == result);
+            assert_eq!(test_message_1, result);
             println!("conn 1 => conn 2 | OK.");
             Ok(())
         });
@@ -126,7 +126,7 @@ mod tests {
 
         recv_result = test_conn_1.recv().and_then(|(_, _, v)| {
             let result = String::from_utf8(v.to_vec()).unwrap();
-            assert!(test_message_2 == result);
+            assert_eq!(test_message_2, result);
             println!("conn 2 => conn 1 | OK.");
             Ok(())
         });
