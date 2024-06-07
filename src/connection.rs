@@ -49,13 +49,10 @@ impl Net {
                 let mut buffer = [0u8; 512];
 
                 loop {
-                    sc_ref
-                        .clone()
-                        .recv_from(&mut buffer)
-                        .iter()
-                        .flat_map(|(amt, src)| {
-                            tx.send((src.to_string(), Bytes::copy_from_slice(&buffer[..(*amt)])))
-                        });
+                    if let Ok((amt, src)) = sc_ref.recv_from(&mut buffer) {
+                        tx.send((src.to_string(), Bytes::copy_from_slice(&buffer[..amt])));
+                    };
+                    buffer = [0u8; 512];
                 }
             })?;
 
@@ -77,7 +74,7 @@ impl Connection for Net {
 
         let sock = self.sock.clone();
         sock.connect(address.clone())?;
-        let record_size = sock.send(buffer)?;
+        let record_size = sock.send_to(buffer, address)?;
         let local_address = sock.local_addr()?.to_string();
         let remote_address = sock.peer_addr()?.to_string();
         Ok((local_address, remote_address, record_size))
