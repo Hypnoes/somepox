@@ -46,7 +46,7 @@ where
     }
 
     /// 将所有发件箱中的待发邮件发送至接收者。
-    fn flush(&self) -> Result<()> {
+    pub fn flush(&self) -> Result<()> {
         for mail in self.send_list.borrow_mut().iter() {
             for recivers in mail.receivers().iter() {
                 self.conn
@@ -57,7 +57,7 @@ where
     }
 
     /// Block 阻塞直至收到新邮件，并添加至收件箱。
-    fn fill_msg_box(&self) -> Result<()> {
+    pub fn fill_msg_box(&self) -> Result<()> {
         let mail = self.conn.recv()?;
         Ok(self.recv_list.try_borrow_mut()?.push_back(mail.try_into()?))
     }

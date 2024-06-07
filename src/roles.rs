@@ -41,7 +41,7 @@ pub struct Master<LogBackend> {
 }
 
 impl<LogBackend: Queryable + Writable> Master<LogBackend> {
-    fn new() -> Self {
+    pub fn new() -> Self {
         todo!()
     }
 
