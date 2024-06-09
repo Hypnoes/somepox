@@ -5,13 +5,14 @@ use std::{
     collections::HashMap,
 };
 
+use anyhow::{anyhow, Result};
+
 use crate::{
     connection::Net,
     issue::{Issue, IssueType},
     logbackend::{LogBackend, Queryable, Writable},
     mailbox::{Mail, MailBox},
 };
-use anyhow::{anyhow, Result};
 
 type Address = String;
 type AddressBook = HashMap<String, Vec<String>>;
@@ -19,8 +20,8 @@ type AddressBook = HashMap<String, Vec<String>>;
 /// Master 负责三个角色
 ///
 /// # 议长：
-/// 1. 从 *提议者(Proposer)* 接受 *提案(Proposol)*
-/// 2. 将 *提案(Proposol)* 交由所有 *议员(Senator)* *表决(Vote)*
+/// 1. 从 *提议者(Proposer)* 接受 *提案(Proposal)*
+/// 2. 将 *提案(Proposal)* 交由所有 *议员(Senator)* *表决(Vote)*
 /// 3. 将 *表决(Vote)* 结果收回，*唱票(Counting)*
 /// 4. 将投票结果交由 *书记(Secretary)* 记录在案形成最终 *决议(Resolution)*
 ///
@@ -88,7 +89,7 @@ impl Master {
 
     // 当收到投票时，为对应议案进行计票，如果票数过半，就生成议案交由书记记录
     // 当投票未过半，返回Error("not enough votes")
-    pub fn procss_vote(&self, issue: Issue) -> Result<()> {
+    pub fn process_vote(&self, issue: Issue) -> Result<()> {
         let half_of_voters = (self.senators() / 2) as u8;
 
         match self.vote_table.borrow().get(&issue) {
@@ -107,7 +108,7 @@ impl Master {
                 }
             }
             // 此决议已完成表决，或未有此决议的提案
-            None => Err(anyhow!("this proposal is either not emmitted or finished")),
+            None => Err(anyhow!("this proposal is either not emitted or finished")),
         }
     }
 

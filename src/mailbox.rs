@@ -8,19 +8,19 @@ use bytes::Bytes;
 use crate::connection::Connection;
 
 pub struct MailBox<Content>
-where
-    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
+    where
+        Content: Clone + TryFrom<Bytes> + Into<Bytes>,
 {
     send_list: RefCell<VecDeque<Mail<Content>>>,
     recv_list: RefCell<VecDeque<Mail<Content>>>,
-    conn: Box<dyn Connection<Addr = String>>,
+    conn: Box<dyn Connection<Addr=String>>,
 }
 
 impl<Message> MailBox<Message>
-where
-    Message: Clone + TryFrom<Bytes> + Into<Bytes>,
+    where
+        Message: Clone + TryFrom<Bytes> + Into<Bytes>,
 {
-    pub fn new(conn: Box<dyn Connection<Addr = String>>) -> Self {
+    pub fn new(conn: Box<dyn Connection<Addr=String>>) -> Self {
         MailBox {
             send_list: RefCell::new(VecDeque::new()),
             recv_list: RefCell::new(VecDeque::new()),
@@ -44,9 +44,9 @@ where
     /// 将所有发件箱中的待发邮件发送至接收者。
     pub fn flush(&self) -> Result<()> {
         for mail in self.send_list.borrow_mut().iter() {
-            for recivers in mail.receivers().iter() {
+            for receivers in mail.receivers().iter() {
                 self.conn
-                    .send(recivers.to_owned().into(), mail.body().into())?;
+                    .send(receivers.to_owned().into(), mail.body().into())?;
             }
         }
         Ok(())
@@ -60,8 +60,8 @@ where
 }
 
 pub struct Mail<Content>
-where
-    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
+    where
+        Content: Clone + TryFrom<Bytes> + Into<Bytes>,
 {
     from: String,
     to: String,
@@ -97,9 +97,9 @@ impl<Content: Clone + TryFrom<Bytes> + Into<Bytes>> Mail<Content> {
 }
 
 impl<A, Content> TryFrom<(A, A, Bytes)> for Mail<Content>
-where
-    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
-    A: TryFrom<String> + Into<String>,
+    where
+        Content: Clone + TryFrom<Bytes> + Into<Bytes>,
+        A: TryFrom<String> + Into<String>,
 {
     type Error = anyhow::Error;
 

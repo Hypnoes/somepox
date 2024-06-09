@@ -2,7 +2,7 @@
 //! Use Heap Memory to store log messages.
 //!
 //! **Details** :
-//! 1. queriable
+//! 1. queryable
 //! 2. indexed
 //! 3. ordered
 //! 4. versioned
@@ -14,16 +14,18 @@
 //! 1. refcell ➡️ the log items is growable
 //! 2. btreemap ➡️ log can be queried by index id
 //! 3. refcell ➡️ version can be bumped
-//! 4. linkedlist ➡️ last item indecated the last version of the log content
+//! 4. linkedlist ➡️ last item indicated the last version of the log content
 //!
 //!
 #![allow(unused)]
-use anyhow::{anyhow, Result};
-use bytes::Bytes;
+
 use std::{
     cell::RefCell,
     collections::{BTreeMap, LinkedList},
 };
+
+use anyhow::{anyhow, Result};
+use bytes::Bytes;
 
 use super::{LogBackend, Queryable, Writable};
 
@@ -71,11 +73,13 @@ impl LogBackend for HeapLogBackend {}
 
 #[cfg(test)]
 mod tests {
-    use crate::logbackend::HeapLogBackend;
-    use crate::logbackend::Writable;
-    use bytes::Bytes;
     use std::collections::LinkedList;
     use std::fmt::{Display, Formatter, Result as FmtResult};
+
+    use bytes::Bytes;
+
+    use crate::logbackend::HeapLogBackend;
+    use crate::logbackend::Writable;
 
     impl Display for HeapLogBackend {
         fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
