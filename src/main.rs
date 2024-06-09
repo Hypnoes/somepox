@@ -1,3 +1,13 @@
+use std::{collections::HashMap, path::PathBuf, thread};
+
+use anyhow::{anyhow, Result};
+use clap::{Parser, Subcommand};
+
+use api::api_server_init;
+use config::{Config, load_config, LogType};
+use logbackend::{FileLogBackend, HeapLogBackend, LogBackend};
+use roles::{Master, Worker};
+
 mod api;
 mod config;
 mod connection;
@@ -6,15 +16,6 @@ mod issue;
 mod logbackend;
 mod mailbox;
 mod roles;
-
-use std::{collections::HashMap, path::PathBuf, thread};
-
-use anyhow::{anyhow, Result};
-use api::api_server_init;
-use clap::{Parser, Subcommand};
-use config::{load_config, Config, LogType};
-use logbackend::{FileLogBackend, HeapLogBackend, LogBackend};
-use roles::{Master, Worker};
 
 /// A Simple Paxos Algorithm Implement.
 #[derive(Parser)]
@@ -42,11 +43,11 @@ fn start_master(cfg: Config) -> Result<()> {
     let api_endpoint = cfg.api();
 
     let mut address_book = HashMap::new();
-    let mut woker_list = Vec::with_capacity(5);
+    let mut worker_list = Vec::with_capacity(5);
     for v in cfg.address_book().values() {
-        woker_list.push(v.clone());
+        worker_list.push(v.clone());
     }
-    address_book.insert("woker".to_string(), woker_list);
+    address_book.insert("worker".to_string(), worker_list);
 
     let logbackend: Box<dyn LogBackend> = match cfg.log_backend() {
         LogType::Heap => Box::new(HeapLogBackend::new()),
@@ -63,7 +64,7 @@ fn start_master(cfg: Config) -> Result<()> {
 
     api_handler
         .join()
-        .map_err(|_| anyhow!("Can't finishing thread API-servcie."))?;
+        .map_err(|_| anyhow!("Can't finishing thread API-service."))?;
 
     Ok(())
 }
