@@ -16,3 +16,5 @@ pub trait Writable {
 pub trait Queryable {
     fn query(&self, id: u64) -> Result<Bytes>;
 }
+
+pub trait LogBackend: Queryable + Writable {}

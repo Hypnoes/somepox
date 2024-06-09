@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use bytes::Bytes;
+use core::hash;
 use std::{
     net::UdpSocket,
     sync::{
@@ -28,11 +29,23 @@ pub trait Connection {
 }
 
 pub struct Ipc {}
+
+impl Drop for Ipc {
+    fn drop(&mut self) {
+        todo!()
+    }
+}
 pub struct Channel {}
+
+impl Drop for Channel {
+    fn drop(&mut self) {
+        todo!()
+    }
+}
 
 pub struct Net {
     sock: Arc<UdpSocket>,
-    handler: JoinHandle<()>,
+    handler: Option<JoinHandle<()>>,
     channel: Receiver<(String, Bytes)>,
     addr: String,
 }
@@ -58,7 +71,7 @@ impl Net {
 
         Ok(Net {
             sock: sc,
-            handler: serv_handler,
+            handler: Some(serv_handler),
             channel: rx,
             addr: endpoint,
         })
@@ -87,6 +100,16 @@ impl Connection for Net {
         let (remote_addr, data) = self.channel.recv()?;
         let local_addr = self.addr.clone();
         Ok((local_addr, remote_addr, data))
+    }
+}
+
+impl Drop for Net {
+    fn drop(&mut self) {
+        let join_handler = self.handler.take();
+        match join_handler {
+            Some(h) => h.join(),
+            None => Ok(()),
+        };
     }
 }
 

@@ -7,24 +7,20 @@ use bytes::Bytes;
 
 use crate::connection::Connection;
 
-pub struct MailBox<Content, Pipe>
+pub struct MailBox<Content>
 where
     Content: Clone + TryFrom<Bytes> + Into<Bytes>,
-    Pipe: Connection,
-    Pipe::Addr: From<String>,
 {
     send_list: RefCell<VecDeque<Mail<Content>>>,
     recv_list: RefCell<VecDeque<Mail<Content>>>,
-    conn: Pipe,
+    conn: Box<dyn Connection<Addr = String>>,
 }
 
-impl<Message, Pipe> MailBox<Message, Pipe>
+impl<Message> MailBox<Message>
 where
     Message: Clone + TryFrom<Bytes> + Into<Bytes>,
-    Pipe: Connection,
-    Pipe::Addr: From<String>,
 {
-    pub fn new(conn: Pipe) -> Self {
+    pub fn new(conn: Box<dyn Connection<Addr = String>>) -> Self {
         MailBox {
             send_list: RefCell::new(VecDeque::new()),
             recv_list: RefCell::new(VecDeque::new()),

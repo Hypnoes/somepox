@@ -2,7 +2,7 @@
 //! Use File to Store Log
 //!
 #![allow(unused)]
-use super::Writable;
+use super::{LogBackend, Queryable, Writable};
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
 use std::{fs::File, io::Write};
@@ -34,6 +34,14 @@ impl Writable for FileLogBackend {
             .map_err(|e| anyhow!(e))
     }
 }
+
+impl Queryable for FileLogBackend {
+    fn query(&self, id: u64) -> Result<Bytes> {
+        todo!()
+    }
+}
+
+impl LogBackend for FileLogBackend {}
 
 #[cfg(test)]
 mod tests {

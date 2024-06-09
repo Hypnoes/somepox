@@ -8,7 +8,7 @@ use std::{
 use crate::{
     connection::Net,
     issue::{Issue, IssueType},
-    logbackend::{Queryable, Writable},
+    logbackend::{LogBackend, Queryable, Writable},
     mailbox::{Mail, MailBox},
 };
 use anyhow::{anyhow, Result};
@@ -31,23 +31,35 @@ type AddressBook = HashMap<String, Vec<String>>;
 /// 将议题 *决定(Resolution)* 写入记录中
 ///
 ///
-pub struct Master<LogBackend> {
+pub struct Master {
     address: Address,
     address_book: AddressBook,
-    mail_box: MailBox<Issue, Net>,
+    mail_box: MailBox<Issue>,
     vote_table: RefCell<HashMap<Issue, u8>>,
     counter: Cell<u64>,
-    logbackend: LogBackend,
+    logbackend: Box<dyn LogBackend>,
 }
 
-impl<LogBackend: Queryable + Writable> Master<LogBackend> {
-    pub fn new() -> Self {
-        todo!()
+impl Master {
+    pub fn new(
+        address: Address,
+        address_book: AddressBook,
+        log_backend: Box<dyn LogBackend>,
+    ) -> Result<Self> {
+        let mail_box = MailBox::new(Box::new(Net::new(address.clone())?));
+        Ok(Self {
+            address: address,
+            address_book: address_book,
+            mail_box: mail_box,
+            vote_table: RefCell::new(HashMap::new()),
+            counter: Cell::new(0),
+            logbackend: log_backend,
+        })
     }
 
     /// 获取当前在线的议员的数量
     fn senators(&self) -> usize {
-        todo!()
+        1
     }
 
     /// 提议新的议题
@@ -99,7 +111,7 @@ impl<LogBackend: Queryable + Writable> Master<LogBackend> {
         }
     }
 
-    fn get_log(&self, id: u64) -> Result<String> {
+    pub fn get_log(&self, id: u64) -> Result<String> {
         let query_result = self.logbackend.query(id)?;
         Ok(String::from_utf8(query_result.into())?)
     }
@@ -112,13 +124,19 @@ impl<LogBackend: Queryable + Writable> Master<LogBackend> {
 pub struct Worker {
     address: Address,
     address_book: AddressBook,
-    mail_box: MailBox<Issue, Net>,
+    mail_box: MailBox<Issue>,
     last_proposal_id: u64,
 }
 
 impl Worker {
-    fn new() -> Self {
-        todo!()
+    pub fn new(address: Address, address_book: AddressBook) -> Result<Self> {
+        let mail_box = MailBox::new(Box::new(Net::new(address.clone())?));
+        Ok(Self {
+            address: address,
+            address_book: address_book,
+            mail_box: mail_box,
+            last_proposal_id: 0,
+        })
     }
 
     fn vote(&self, issue: Issue) -> Result<()> {

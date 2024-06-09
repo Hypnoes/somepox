@@ -25,7 +25,7 @@ use std::{
     collections::{BTreeMap, LinkedList},
 };
 
-use super::{Queryable, Writable};
+use super::{LogBackend, Queryable, Writable};
 
 pub struct HeapLogBackend {
     table: RefCell<BTreeMap<u64, RefCell<LinkedList<Bytes>>>>,
@@ -67,6 +67,8 @@ impl Queryable for HeapLogBackend {
     }
 }
 
+impl LogBackend for HeapLogBackend {}
+
 #[cfg(test)]
 mod tests {
     use crate::logbackend::HeapLogBackend;
@@ -105,7 +107,11 @@ mod tests {
     #[test]
     fn heap_logbackend_new_test() {
         let test_backend = HeapLogBackend::new();
-        assert_eq!(test_backend.table.borrow().len(), 0, "test_backend table is not empty");
+        assert_eq!(
+            test_backend.table.borrow().len(),
+            0,
+            "test_backend table is not empty"
+        );
     }
 
     #[test]
