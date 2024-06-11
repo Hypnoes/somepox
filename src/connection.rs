@@ -4,9 +4,9 @@ use anyhow::Result;
 use bytes::Bytes;
 use core::hash;
 use std::{
-    net::UdpSocket,
+    net::{ToSocketAddrs, UdpSocket},
     sync::{
-        mpsc::{channel, Receiver},
+        mpsc::{channel, Receiver, Sender},
         Arc,
     },
     thread::{self, JoinHandle},
@@ -23,25 +23,15 @@ use std::{
    3. 网络：通过Socket通信
 */
 pub trait Connection {
-    type Addr: TryFrom<String> + Into<String>;
+    type Addr: Clone;
+    fn address(&self) -> Self::Addr;
     fn send(&self, address: Self::Addr, data: Bytes) -> Result<(Self::Addr, Self::Addr, usize)>;
     fn recv(&self) -> Result<(Self::Addr, Self::Addr, Bytes)>;
 }
 
 pub struct Ipc {}
 
-impl Drop for Ipc {
-    fn drop(&mut self) {
-        todo!()
-    }
-}
 pub struct Channel {}
-
-impl Drop for Channel {
-    fn drop(&mut self) {
-        todo!()
-    }
-}
 
 pub struct Net {
     sock: Arc<UdpSocket>,
@@ -57,13 +47,15 @@ impl Net {
 
         let sc_ref = sc.clone();
         let serv_handler = thread::Builder::new()
-            .name("Socket listener thread".to_string())
+            .name("udp_socket".to_string())
             .spawn(move || {
                 let mut buffer = [0u8; 512];
 
                 loop {
                     if let Ok((amt, src)) = sc_ref.recv_from(&mut buffer) {
                         tx.send((src.to_string(), Bytes::copy_from_slice(&buffer[..amt])));
+                    } else {
+                        break;
                     };
                     buffer = [0u8; 512];
                 }
@@ -80,6 +72,10 @@ impl Net {
 
 impl Connection for Net {
     type Addr = String;
+
+    fn address(&self) -> Self::Addr {
+        self.addr.clone()
+    }
 
     /// send a message
     ///
@@ -107,7 +103,7 @@ impl Drop for Net {
     fn drop(&mut self) {
         let join_handler = self.handler.take();
         match join_handler {
-            Some(h) => h.join(),
+            Some(handler) => handler.join(),
             None => Ok(()),
         };
     }

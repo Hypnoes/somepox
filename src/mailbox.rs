@@ -7,20 +7,22 @@ use bytes::Bytes;
 
 use crate::connection::Connection;
 
-pub struct MailBox<Content>
-    where
-        Content: Clone + TryFrom<Bytes> + Into<Bytes>,
+pub struct MailBox<Addr, Content>
+where
+    Addr: Clone,
+    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
 {
-    send_list: RefCell<VecDeque<Mail<Content>>>,
-    recv_list: RefCell<VecDeque<Mail<Content>>>,
-    conn: Box<dyn Connection<Addr=String>>,
+    send_list: RefCell<VecDeque<Mail<Addr, Content>>>,
+    recv_list: RefCell<VecDeque<Mail<Addr, Content>>>,
+    conn: Box<dyn Connection<Addr = Addr>>,
 }
 
-impl<Message> MailBox<Message>
-    where
-        Message: Clone + TryFrom<Bytes> + Into<Bytes>,
+impl<Addr, Content> MailBox<Addr, Content>
+where
+    Addr: Clone,
+    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
 {
-    pub fn new(conn: Box<dyn Connection<Addr=String>>) -> Self {
+    pub fn new(conn: Box<dyn Connection<Addr = Addr>>) -> Self {
         MailBox {
             send_list: RefCell::new(VecDeque::new()),
             recv_list: RefCell::new(VecDeque::new()),
@@ -29,7 +31,7 @@ impl<Message> MailBox<Message>
     }
 
     /// 从收件箱获取新邮件
-    pub fn get_mail(&self) -> Result<Mail<Message>> {
+    pub fn get_mail(&self) -> Result<Mail<Addr, Content>> {
         match self.recv_list.try_borrow_mut()?.pop_front() {
             Some(mail) => Ok(mail),
             None => Err(anyhow!("MailBox is empty")),
@@ -37,7 +39,7 @@ impl<Message> MailBox<Message>
     }
 
     /// 将邮件放置入发件箱
-    pub fn put_mail(&self, mail: Mail<Message>) -> Result<()> {
+    pub fn put_mail(&self, mail: Mail<Addr, Content>) -> Result<()> {
         Ok(self.send_list.try_borrow_mut()?.push_back(mail))
     }
 
@@ -59,17 +61,22 @@ impl<Message> MailBox<Message>
     }
 }
 
-pub struct Mail<Content>
-    where
-        Content: Clone + TryFrom<Bytes> + Into<Bytes>,
+pub struct Mail<Addr, Content>
+where
+    Addr: Clone,
+    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
 {
-    from: String,
-    to: String,
+    from: Addr,
+    to: Vec<Addr>,
     body: Box<Content>,
 }
 
-impl<Content: Clone + TryFrom<Bytes> + Into<Bytes>> Mail<Content> {
-    pub fn new(from: String, to: String, content: Content) -> Mail<Content> {
+impl<Addr, Content> Mail<Addr, Content>
+where
+    Addr: Clone,
+    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
+{
+    pub fn new(from: Addr, to: Vec<Addr>, content: Content) -> Mail<Addr, Content> {
         Mail {
             from,
             to,
@@ -81,32 +88,43 @@ impl<Content: Clone + TryFrom<Bytes> + Into<Bytes>> Mail<Content> {
         (*self.body).clone()
     }
 
-    pub fn sender(&self) -> String {
+    pub fn sender(&self) -> Addr {
         self.from.clone()
     }
 
-    pub fn receivers(&self) -> Vec<String> {
-        let mut rcs_v: Vec<String> = Vec::new();
-
-        for rcs in self.to.split(",").into_iter() {
-            rcs_v.push(rcs.to_string());
-        }
-
-        rcs_v
+    pub fn receivers(&self) -> Vec<Addr> {
+        self.to.clone()
     }
 }
 
-impl<A, Content> TryFrom<(A, A, Bytes)> for Mail<Content>
-    where
-        Content: Clone + TryFrom<Bytes> + Into<Bytes>,
-        A: TryFrom<String> + Into<String>,
+impl<Addr, Content> TryFrom<(Addr, Addr, Bytes)> for Mail<Addr, Content>
+where
+    Addr: Clone,
+    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
 {
     type Error = anyhow::Error;
 
-    fn try_from(value: (A, A, Bytes)) -> std::result::Result<Self, Self::Error> {
+    fn try_from(value: (Addr, Addr, Bytes)) -> std::result::Result<Self, Self::Error> {
         Ok(Mail::new(
-            value.0.into(),
-            value.1.into(),
+            value.0,
+            vec![value.1],
+            Content::try_from(value.2)
+                .map_err(|_| anyhow!("can not deserialize bytes into Main::Content"))?,
+        ))
+    }
+}
+
+impl<Addr, Content> TryFrom<(Addr, Vec<Addr>, Bytes)> for Mail<Addr, Content>
+where
+    Addr: Clone,
+    Content: Clone + TryFrom<Bytes> + Into<Bytes>,
+{
+    type Error = anyhow::Error;
+
+    fn try_from(value: (Addr, Vec<Addr>, Bytes)) -> std::result::Result<Self, Self::Error> {
+        Ok(Mail::new(
+            value.0,
+            value.1,
             Content::try_from(value.2)
                 .map_err(|_| anyhow!("can not deserialize bytes into Main::Content"))?,
         ))

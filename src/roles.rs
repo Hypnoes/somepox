@@ -3,12 +3,13 @@
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
+    sync::Arc,
 };
 
 use anyhow::{anyhow, Result};
 
 use crate::{
-    connection::Net,
+    connection::{Connection, Net},
     issue::{Issue, IssueType},
     logbackend::{LogBackend, Queryable, Writable},
     mailbox::{Mail, MailBox},
@@ -35,7 +36,7 @@ type AddressBook = HashMap<String, Vec<String>>;
 pub struct Master {
     address: Address,
     address_book: AddressBook,
-    mail_box: MailBox<Issue>,
+    mail_box: MailBox<String, Issue>,
     vote_table: RefCell<HashMap<Issue, u8>>,
     counter: Cell<u64>,
     logbackend: Box<dyn LogBackend>,
@@ -47,11 +48,10 @@ impl Master {
         address_book: AddressBook,
         log_backend: Box<dyn LogBackend>,
     ) -> Result<Self> {
-        let mail_box = MailBox::new(Box::new(Net::new(address.clone())?));
         Ok(Self {
-            address: address,
+            address: address.clone(),
             address_book: address_book,
-            mail_box: mail_box,
+            mail_box: MailBox::new(Box::new(Net::new(address)?)),
             vote_table: RefCell::new(HashMap::new()),
             counter: Cell::new(0),
             logbackend: log_backend,
@@ -59,8 +59,13 @@ impl Master {
     }
 
     /// 获取当前在线的议员的数量
+    ///
+    /// **TODO**: 这里获取的是被配置的worker数量，而不是实时在线的数量
     fn senators(&self) -> usize {
-        1
+        self.address_book
+            .get("worker")
+            .map(|v| v.len())
+            .unwrap_or(0)
     }
 
     /// 提议新的议题
@@ -78,8 +83,8 @@ impl Master {
         // TODO: 错误处理，这里发生错误会被丢弃
         self.address_book.get("worker").map(|addr| {
             let worker_address = addr.join(",");
-            let mail = Mail::new(self.address.clone(), worker_address, issue);
-            self.mail_box.put_mail(mail)
+            let mail = Mail::new(self.address.clone(), vec![worker_address], issue);
+            self.mail_box.put_mail(mail);
         });
 
         // 更新议题编号
@@ -87,28 +92,33 @@ impl Master {
         Ok(())
     }
 
-    // 当收到投票时，为对应议案进行计票，如果票数过半，就生成议案交由书记记录
-    // 当投票未过半，返回Error("not enough votes")
-    pub fn process_vote(&self, issue: Issue) -> Result<()> {
+    /// 当收到投票时，为对应议案进行计票，如果票数过半，就生成议案交由书记记录
+    ///
+    /// 当投票未过半，返回Error("not enough votes")
+    pub fn process_vote(&self) -> Result<()> {
         let half_of_voters = (self.senators() / 2) as u8;
 
-        match self.vote_table.borrow().get(&issue) {
-            // 此决议正在表决中
-            Some(cnt) => {
-                // 表决通过了
-                if cnt + 1 > half_of_voters {
-                    self.vote_table.borrow_mut().remove(&issue);
-                    self.logbackend
-                        .write(issue.id().into(), issue.content().into())
+        if let Ok(issue) = self.mail_box.get_mail().map(|mail| mail.body()) {
+            match self.vote_table.borrow().get(&issue) {
+                // 此决议正在表决中
+                Some(cnt) => {
+                    // 表决通过了
+                    if cnt + 1 > half_of_voters {
+                        self.vote_table.borrow_mut().remove(&issue);
+                        self.logbackend
+                            .write(issue.id().into(), issue.content().into())
+                    }
+                    // 表决进行中
+                    else {
+                        self.vote_table.borrow_mut().insert(issue, cnt + 1);
+                        Err(anyhow!("not enough votes"))
+                    }
                 }
-                // 表决进行中
-                else {
-                    self.vote_table.borrow_mut().insert(issue, cnt + 1);
-                    Err(anyhow!("not enough votes"))
-                }
+                // 此决议已完成表决，或未有此决议的提案
+                None => Err(anyhow!("this proposal is either not emitted or finished")),
             }
-            // 此决议已完成表决，或未有此决议的提案
-            None => Err(anyhow!("this proposal is either not emitted or finished")),
+        } else {
+            Err(anyhow!("Error"))
         }
     }
 
@@ -125,44 +135,47 @@ impl Master {
 pub struct Worker {
     address: Address,
     address_book: AddressBook,
-    mail_box: MailBox<Issue>,
+    mail_box: MailBox<String, Issue>,
     last_proposal_id: u64,
 }
 
 impl Worker {
     pub fn new(address: Address, address_book: AddressBook) -> Result<Self> {
-        let mail_box = MailBox::new(Box::new(Net::new(address.clone())?));
         Ok(Self {
-            address: address,
+            address: address.clone(),
             address_book: address_book,
-            mail_box: mail_box,
+            mail_box: MailBox::new(Box::new(Net::new(address)?)),
             last_proposal_id: 0,
         })
     }
 
-    fn vote(&self, issue: Issue) -> Result<()> {
-        if issue.id() > self.last_proposal_id {
-            self.address_book
-                .get("master")
-                .map(|addr| {
-                    let worker_address = addr.join(",");
-                    let mail = Mail::new(
-                        self.address.clone(),
-                        worker_address,
-                        Issue::new(issue.content(), issue.id(), IssueType::Vote),
-                    );
-                    self.mail_box.put_mail(mail).ok()
-                })
-                .flatten()
-                .ok_or(anyhow!(
-                    "Can not Send Vote to Master. Check address_book setting."
+    pub fn vote(&self) -> Result<()> {
+        if let Ok(issue) = self.mail_box.get_mail().map(|mail| mail.body()) {
+            if issue.id() > self.last_proposal_id {
+                self.address_book
+                    .get("master")
+                    .map(|addr| {
+                        let worker_address = addr.join(",");
+                        let mail = Mail::new(
+                            self.address.clone(),
+                            vec![worker_address],
+                            Issue::new(issue.content(), issue.id(), IssueType::Vote),
+                        );
+                        self.mail_box.put_mail(mail).ok()
+                    })
+                    .flatten()
+                    .ok_or(anyhow!(
+                        "Can not Send Vote to Master. Check address_book setting."
+                    ))
+            } else {
+                Err(anyhow!(
+                    "received expire issue {}, last issue is {}, drop.",
+                    issue.id(),
+                    self.last_proposal_id
                 ))
+            }
         } else {
-            Err(anyhow!(
-                "received expire issue {}, last issue is {}, drop.",
-                issue.id(),
-                self.last_proposal_id
-            ))
+            Err(anyhow!("Error"))
         }
     }
 }

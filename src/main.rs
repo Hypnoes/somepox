@@ -1,10 +1,10 @@
-use std::{collections::HashMap, path::PathBuf, thread};
+use std::{collections::HashMap, path::PathBuf, sync::mpsc::channel, thread, time::Duration};
 
 use anyhow::{anyhow, Result};
 use clap::{Parser, Subcommand};
 
 use api::api_server_init;
-use config::{Config, load_config, LogType};
+use config::{load_config, Config, LogType};
 use logbackend::{FileLogBackend, HeapLogBackend, LogBackend};
 use roles::{Master, Worker};
 
@@ -41,30 +41,54 @@ enum Role {
 
 fn start_master(cfg: Config) -> Result<()> {
     let api_endpoint = cfg.api();
+    let (tx, rx) = channel();
+    let api_handler = thread::Builder::new()
+        .name("master_api_interface".to_string())
+        .spawn(move || api_server_init(api_endpoint, tx).ok())?;
 
+    let address = cfg.address();
     let mut address_book = HashMap::new();
     let mut worker_list = Vec::with_capacity(5);
     for v in cfg.address_book().values() {
         worker_list.push(v.clone());
     }
     address_book.insert("worker".to_string(), worker_list);
+    let log_type = cfg.log_backend();
 
-    let logbackend: Box<dyn LogBackend> = match cfg.log_backend() {
-        LogType::Heap => Box::new(HeapLogBackend::new()),
-        LogType::File(file_name) => Box::new(FileLogBackend::new(&file_name)),
-    };
+    let service_handler = thread::Builder::new()
+        .name("master_interface".to_string())
+        .spawn(move || {
+            let logbackend: Box<dyn LogBackend> = match log_type {
+                LogType::Heap => Box::new(HeapLogBackend::new()),
+                LogType::File(file_name) => Box::new(FileLogBackend::new(&file_name)),
+            };
 
-    let _master = Master::new(cfg.address(), address_book, logbackend)?;
+            let master = Master::new(address, address_book, logbackend);
 
-    let api_handler = thread::Builder::new()
-        .name("master_api_interface".to_string())
-        .spawn(move || api_server_init(api_endpoint).ok())?;
+            if let Ok(master) = master {
+                loop {
+                    if let Ok(cmd) = rx.recv() {
+                        let _ = match cmd {
+                            api::CmdType::Log(log_command) => {
+                                let _ = master.emmit_new_proposal(log_command.clone());
+                                Ok(log_command)
+                            }
+                            api::CmdType::Query(id) => master.get_log(id),
+                        };
+                    }
+                    let _ = master.process_vote();
 
-    // todo: 如何解决 Master 和 API service 之间相互通信调用的问题。
+                    thread::sleep(Duration::from_secs(1));
+                }
+            }
+        })?;
 
     api_handler
         .join()
         .map_err(|_| anyhow!("Can't finishing thread API-service."))?;
+    service_handler
+        .join()
+        .map_err(|_| anyhow!("Can't finishing thread Master-service."))?;
 
     Ok(())
 }
@@ -77,9 +101,17 @@ fn start_worker(cfg: Config) -> Result<()> {
     }
     address_book.insert("master".to_string(), master);
 
-    let _worker = Worker::new(cfg.address(), address_book);
+    let service_handler = thread::Builder::new()
+        .name("worker_service".to_string())
+        .spawn(move || {
+            if let Ok(worker) = Worker::new(cfg.address(), address_book) {
+                loop {
+                    let _ = worker.vote();
+                }
+            };
+        })?;
 
-    Ok(())
+    service_handler.join().map_err(|_| anyhow!("ERROR"))
 }
 
 fn main() -> Result<()> {
