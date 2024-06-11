@@ -1,4 +1,4 @@
-use std::{fmt, process::id, sync::mpsc::Sender};
+use std::{fmt, sync::mpsc::Sender};
 
 use actix_web::{rt, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::{anyhow, Result};

@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::{
     collections::HashMap,
     thread::{self, JoinHandle},
@@ -5,7 +7,7 @@ use std::{
 
 use anyhow::{anyhow, Result};
 
-trait Task: Send + 'static {
+pub trait Task: Send + 'static {
     fn get_name(&self) -> String;
     fn task(&self) -> impl Fn() -> () + Send + 'static;
 }
@@ -78,11 +80,11 @@ mod tests {
 
         let mut executor = Executor::new();
 
-        executor.execute(test_obj);
+        let r = executor.execute(test_obj);
+        assert!(r.is_ok());
 
         thread::sleep(Duration::from_secs(1));
-        executor.join();
-
-        assert!(1 == 1);
+        let r = executor.join();
+        assert!(r.is_ok());
     }
 }

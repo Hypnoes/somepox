@@ -40,12 +40,15 @@ enum Role {
 }
 
 fn start_master(cfg: Config) -> Result<()> {
+    // 初始化Web-API功能
     let api_endpoint = cfg.api();
     let (tx, rx) = channel();
+    // 启动Web-API
     let api_handler = thread::Builder::new()
         .name("master_api_interface".to_string())
         .spawn(move || api_server_init(api_endpoint, tx).ok())?;
 
+    // 准备Master的配置
     let address = cfg.address();
     let mut address_book = HashMap::new();
     let mut worker_list = Vec::with_capacity(5);
@@ -55,6 +58,7 @@ fn start_master(cfg: Config) -> Result<()> {
     address_book.insert("worker".to_string(), worker_list);
     let log_type = cfg.log_backend();
 
+    // 启动master服务
     let service_handler = thread::Builder::new()
         .name("master_interface".to_string())
         .spawn(move || {
@@ -83,9 +87,11 @@ fn start_master(cfg: Config) -> Result<()> {
             }
         })?;
 
+    // 等待API服务结束
     api_handler
         .join()
         .map_err(|_| anyhow!("Can't finishing thread API-service."))?;
+    // 等待主服务结束
     service_handler
         .join()
         .map_err(|_| anyhow!("Can't finishing thread Master-service."))?;
@@ -94,6 +100,7 @@ fn start_master(cfg: Config) -> Result<()> {
 }
 
 fn start_worker(cfg: Config) -> Result<()> {
+    //准备配置
     let mut address_book = HashMap::new();
     let mut master = Vec::with_capacity(1);
     for v in cfg.address_book().values() {
@@ -101,6 +108,7 @@ fn start_worker(cfg: Config) -> Result<()> {
     }
     address_book.insert("master".to_string(), master);
 
+    // 启动worker服务
     let service_handler = thread::Builder::new()
         .name("worker_service".to_string())
         .spawn(move || {
@@ -111,6 +119,7 @@ fn start_worker(cfg: Config) -> Result<()> {
             };
         })?;
 
+    // 等待worker结束
     service_handler.join().map_err(|_| anyhow!("ERROR"))
 }
 
